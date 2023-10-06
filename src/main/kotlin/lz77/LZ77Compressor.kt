@@ -3,25 +3,13 @@ package lz77
 import java.io.File
 
 // Look into LZ77 vs LZSS
-interface LZ77
-data class LZ77Repeat(val offset: Int, val length: Int): LZ77 {
-    override fun toString(): String {
-        return "(${offset},${length})"
-    }
-}
-data class LZ77Literal(val char: Byte): LZ77 {
-    override fun toString(): String {
-        return char.toInt().toChar().toString()
-    }
-}
-
 class LZ77Compressor(private val windowSize: Int = 20, private val lookaheadBufferSize: Int = 15) {
 
-    fun compress(inputFilePath: String): List<LZ77> {
+    fun compress(inputFilePath: String): List<LZ77Token> {
         val inputFile = File(inputFilePath)
         val inputBytes = inputFile.readBytes()
 
-        val compressedTokens = mutableListOf<LZ77>()
+        val compressedTokens = mutableListOf<LZ77Token>()
         var currentIndex = 0
 
         while (currentIndex < inputBytes.size) {
