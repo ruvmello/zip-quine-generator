@@ -11,6 +11,6 @@ fun main(args: Array<String>) {
 
     // Print the compressed tokens
     for (token in compressedTokens) {
-        println("(${token.offset}, ${token.length}, ${token.nextChar.toInt().toChar()})")
+        print(token)
     }
 }

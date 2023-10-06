@@ -2,29 +2,36 @@ package lz77
 
 import java.io.File
 
-data class LZ77Token(val offset: Int, val length: Int, val nextChar: Byte)
+// Look into LZ77 vs LZSS
+interface LZ77
+data class LZ77Repeat(val offset: Int, val length: Int): LZ77 {
+    override fun toString(): String {
+        return "(${offset},${length})"
+    }
+}
+data class LZ77Literal(val char: Byte): LZ77 {
+    override fun toString(): String {
+        return char.toInt().toChar().toString()
+    }
+}
 
 class LZ77Compressor(private val windowSize: Int = 20, private val lookaheadBufferSize: Int = 15) {
 
-    fun compress(inputFilePath: String): List<LZ77Token> {
+    fun compress(inputFilePath: String): List<LZ77> {
         val inputFile = File(inputFilePath)
         val inputBytes = inputFile.readBytes()
 
-        val compressedTokens = mutableListOf<LZ77Token>()
+        val compressedTokens = mutableListOf<LZ77>()
         var currentIndex = 0
 
         while (currentIndex < inputBytes.size) {
             val (maxMatchLength, maxMatchOffset) = findLongestRepeatedOccurenceInWindow(inputBytes, currentIndex)
 
-            val nextChar =
-                if (currentIndex + maxMatchLength < inputBytes.size) inputBytes[currentIndex + maxMatchLength]
-                else 0 // Use a default value if we reach the end of the input (0 is a null byte)
-
             if (maxMatchLength > 0) {
-                compressedTokens.add(LZ77Token(maxMatchOffset, maxMatchLength, nextChar))
-                currentIndex += maxMatchLength + 1
+                compressedTokens.add(LZ77Repeat(maxMatchOffset, maxMatchLength))
+                currentIndex += maxMatchLength
             } else {
-                compressedTokens.add(LZ77Token(0, 0, inputBytes[currentIndex]))
+                compressedTokens.add(LZ77Literal(inputBytes[currentIndex]))
                 currentIndex++
             }
         }
