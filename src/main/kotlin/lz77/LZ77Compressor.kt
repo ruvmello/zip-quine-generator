@@ -5,17 +5,17 @@ import java.io.File
 // Look into LZ77 vs LZSS
 class LZ77Compressor(private val windowSize: Int = 20, private val lookaheadBufferSize: Int = 15) {
 
-    fun compress(inputFilePath: String): List<LZ77Token> {
+    fun compress(inputFilePath: String, minlength: Int = 1): List<LZ77Token> {
         val inputFile = File(inputFilePath)
         val inputBytes = inputFile.readBytes()
 
-        val compressedTokens = mutableListOf<LZ77Token>()
+        val compressedTokens: MutableList<LZ77Token> = mutableListOf()
         var currentIndex = 0
 
         while (currentIndex < inputBytes.size) {
             val (maxMatchLength, maxMatchOffset) = findLongestRepeatedOccurenceInWindow(inputBytes, currentIndex)
 
-            if (maxMatchLength > 0) {
+            if (maxMatchLength >= minlength) {
                 compressedTokens.add(LZ77Repeat(maxMatchOffset, maxMatchLength))
                 currentIndex += maxMatchLength
             } else {
