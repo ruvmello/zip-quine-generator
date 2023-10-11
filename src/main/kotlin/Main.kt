@@ -1,4 +1,6 @@
 import lz77.LZ77Compressor
+import zip.ZIPArchiver
+import java.io.File
 
 fun main(args: Array<String>) {
     println("Program arguments: ${args.joinToString()}")
@@ -13,4 +15,8 @@ fun main(args: Array<String>) {
     for (token in compressedTokens) {
         print(token)
     }
+
+    val file = File("droste.jpg")
+    val zipper = ZIPArchiver("test.zip")
+    zipper.getLocalFileHeader(file.name, file.length().toInt())
 }

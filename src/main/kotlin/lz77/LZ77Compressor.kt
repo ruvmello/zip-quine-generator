@@ -3,7 +3,7 @@ package lz77
 import java.io.File
 
 // Look into LZ77 vs LZSS
-class LZ77Compressor(private val windowSize: Int = 20, private val lookaheadBufferSize: Int = 15) {
+class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookaheadBufferSize: Int = 258) {
 
     fun compress(inputFilePath: String, minlength: Int = 1): List<LZ77Token> {
         val inputFile = File(inputFilePath)
