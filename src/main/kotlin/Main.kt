@@ -19,5 +19,8 @@ fun main(args: Array<String>) {
     val file = File(inputFilePath)
     val zipper = ZIPArchiver("test.zip")
     zipper.getLocalFileHeader(file)
+
+    val offset = zipper.zip.length().toInt()
     zipper.getCentralDirectoryFileHeader(file)
+    zipper.getEndOfCentralDirectoryRecord(1, zipper.zip.length().toInt() - offset, offset)
 }

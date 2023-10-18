@@ -9,7 +9,7 @@ import java.time.LocalDateTime
  * @param zipName the file name to which we write the bytes
  */
 class ZIPArchiver(private val zipName: String = "test.zip") {
-    private val zip = File(this.zipName)
+    val zip = File(this.zipName)
     private val datetime = LocalDateTime.now()
 
     /**
@@ -120,6 +120,36 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         // File comment
         if (comment.isNotEmpty())
             zip.appendBytes(comment.encodeToByteArray())
+    }
+
+    fun getEndOfCentralDirectoryRecord(numberOfFiles: Int, size: Int, offset: Int) {
+        val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
+        zip.appendBytes(zipSignature)
+
+        // Disk number, TODO
+        zip.appendBytes(getByteArrayOf2Bytes(0))
+
+        // Number of disks on which the central directory starts, TODO
+        zip.appendBytes(getByteArrayOf2Bytes(0))
+
+        // Disk entries, TODO
+        zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
+
+        // Total entries, TODO
+        zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
+
+        // Central Directory size, TODO
+        zip.appendBytes(getByteArrayOf4Bytes(size))
+
+        // Offset of the start of the central directory on the disk on which the central directory starts, TODO
+        zip.appendBytes(getByteArrayOf4Bytes(offset))
+
+        val comment = ""
+        // Comment length
+        zip.appendBytes(getByteArrayOf2Bytes(comment.length))
+
+        // Comment
+        zip.appendBytes(comment.encodeToByteArray())
     }
 
     /**
