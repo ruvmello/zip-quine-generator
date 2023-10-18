@@ -19,4 +19,5 @@ fun main(args: Array<String>) {
     val file = File(inputFilePath)
     val zipper = ZIPArchiver("test.zip")
     zipper.getLocalFileHeader(file)
+    zipper.getCentralDirectoryFileHeader(file)
 }

@@ -10,6 +10,7 @@ import java.time.LocalDateTime
  */
 class ZIPArchiver(private val zipName: String = "test.zip") {
     private val zip = File(this.zipName)
+    private val datetime = LocalDateTime.now()
 
     /**
      * Write the local file header to the zip archive we are constructing
@@ -25,6 +26,12 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         zip.appendBytes(zipVersion)
 
         this.writeCommonHeader(file)
+
+        // File name
+        zip.appendBytes(file.name.encodeToByteArray())
+
+        // Extra field content
+        // zip.appendBytes(getByteArrayOf2Bytes(0))
     }
 
     /**
@@ -39,8 +46,6 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
 
         zip.appendBytes(zipFlags)
         zip.appendBytes(zipCompressionMethod)
-
-        val datetime = LocalDateTime.now()
 
         // File modification time
         var timeAsInt: Int = datetime.hour
@@ -66,14 +71,8 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         // File name length
         zip.appendBytes(getByteArrayOf2Bytes(file.name.length))
 
-        // TODO: Extra field length, needed?
+        // Extra field length
         zip.appendBytes(getByteArrayOf2Bytes(0))
-
-        // File name
-        zip.appendBytes(file.name.encodeToByteArray())
-
-        // TODO: Extra fields, is this needed?
-        // zip.appendBytes(getByteArrayOf2Bytes(0))
     }
 
     /**
@@ -87,13 +86,40 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         val zipVersionMadeBy: ByteArray = byteArrayOf(0x14, 0x00)
         val zipVersionNeededToExtract: ByteArray = byteArrayOf(0x14, 0x00)
 
-        zip.writeBytes(zipSignature)
+        zip.appendBytes(zipSignature)
         zip.appendBytes(zipVersionMadeBy)
         zip.appendBytes(zipVersionNeededToExtract)
 
         this.writeCommonHeader(file)
 
-        // TODO add the other fields
+        val comment = ""
+
+        // File comment length
+        zip.appendBytes(getByteArrayOf2Bytes(comment.length))
+
+        // Number of disk TODO: How?
+        zip.appendBytes(getByteArrayOf2Bytes(0))
+
+        // Internal attributes, https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
+        val internalAttributes = byteArrayOf(0x01, 0x00)    // First bit set -> text file, TODO: Extend for other files
+        zip.appendBytes(internalAttributes)
+
+        // External attributes
+        val externalAttributes = byteArrayOf(0x02, 0x00, 0x00, 0x00)    // Lower byte -> zip spec version, TODO: is the other mapping needed?
+        zip.appendBytes(externalAttributes)
+
+        // Offset local header, TODO: is this needed? (windows just sets 0 when compressing)
+        zip.appendBytes(getByteArrayOf4Bytes(0))
+
+        // File name
+        zip.appendBytes(file.name.encodeToByteArray())
+
+        // Extra field content
+        // zip.appendBytes(getByteArrayOf2Bytes(0))
+
+        // File comment
+        if (comment.isNotEmpty())
+            zip.appendBytes(comment.encodeToByteArray())
     }
 
     /**
