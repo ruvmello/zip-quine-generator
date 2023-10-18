@@ -59,8 +59,8 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         dateAsInt = dateAsInt shl 5 xor datetime.dayOfMonth
         zip.appendBytes(getByteArrayOf2Bytes(dateAsInt))
 
-        // TODO: CRC32-Checksum
-        zip.appendBytes(getByteArrayOf4Bytes(0))
+        // CRC32-Checksum, TODO: size bigger than 2GB
+        zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
 
         // TODO: Compressed size
         zip.appendBytes(getByteArrayOf4Bytes(0))
@@ -168,5 +168,39 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
      */
     private fun getByteArrayOf4Bytes(input: Int): ByteArray {
         return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte(), (input shr 16).toByte(), (input shr 24).toByte())
+    }
+
+    /**
+     * Calculate the CRC-32 checksum for a ByteArray
+     * More info: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+     *
+     * @param byteArray the ByteArray for which we calculate the CRC-32 checksum
+     * @return CRC-32 checksum
+     */
+    private fun calculateCRC32(byteArray: ByteArray): Int {
+        // Reference implementation that I ported to kotlin
+        // https://www.rosettacode.org/wiki/CRC-32#C
+        val crc32Table = IntArray(256)
+
+        // Populate the CRC32 lookup table
+        for (i in 0 until 256) {
+            var crc = i
+            for (j in 0 until 8) {
+                crc = if (crc and 1 == 1) {
+                    (crc ushr 1) xor 0xEDB88320.toInt()
+                } else {
+                    crc ushr 1
+                }
+            }
+            crc32Table[i] = crc
+        }
+
+        var crc32 = 0xFFFFFFFF.toInt()
+        for (byte in byteArray) {
+            val index = (crc32 and 0xFF) xor byte.toInt()
+            crc32 = (crc32 ushr 8) xor crc32Table[index]
+        }
+
+        return crc32.inv() and 0xFFFFFFFF.toInt()
     }
 }
