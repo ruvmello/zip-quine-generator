@@ -1,6 +1,8 @@
 import huffman.CompositeNode
 import huffman.HuffmanCompressor
 import huffman.LeafNode
+import lz77.LZ77Literal
+import lz77.LZ77Token
 import org.testng.annotations.Test
 import java.io.File
 
@@ -14,8 +16,11 @@ class HuffmanTest {
         val inputFile = File(inputFilePath)
         val inputBytes = inputFile.readBytes()
 
+        val tokens: MutableList<LZ77Token> = mutableListOf()
+        inputBytes.forEach { tokens.add(LZ77Literal(it)) }
+
         val huffman = HuffmanCompressor()
-        val map = huffman.computeFrequencies(inputBytes)
+        val map = huffman.computeFrequencies(tokens)
         for (token in map) {
             println("Key: ${token.key.toInt().toChar()}, Value: ${token.value}")
         }
@@ -35,8 +40,11 @@ class HuffmanTest {
         val inputFile = File(inputFilePath)
         val inputBytes = inputFile.readBytes()
 
+        val tokens: MutableList<LZ77Token> = mutableListOf()
+        inputBytes.forEach { tokens.add(LZ77Literal(it)) }
+
         val huffman = HuffmanCompressor()
-        val map = huffman.computeFrequencies(inputBytes)
+        val map = huffman.computeFrequencies(tokens)
         val tree = huffman.buildTree(map)
 
         assert(tree.weight == 15)

@@ -35,47 +35,6 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
     }
 
     /**
-     * This method writes the part of the header that is common for the
-     * local file header and the central directory header
-     *
-     * @param file the file for which we have to write the header
-     * */
-    private fun writeCommonHeader(file: File) {
-        val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
-        val zipCompressionMethod: ByteArray = byteArrayOf(0x08, 0x00)
-
-        zip.appendBytes(zipFlags)
-        zip.appendBytes(zipCompressionMethod)
-
-        // File modification time
-        var timeAsInt: Int = datetime.hour
-        timeAsInt = timeAsInt shl 6 xor datetime.minute
-        timeAsInt = timeAsInt shl 5 xor (datetime.second / 2)
-        zip.appendBytes(getByteArrayOf2Bytes(timeAsInt))
-
-        // File modification date
-        var dateAsInt: Int = datetime.year - 1980
-        dateAsInt = dateAsInt shl 4 xor datetime.monthValue
-        dateAsInt = dateAsInt shl 5 xor datetime.dayOfMonth
-        zip.appendBytes(getByteArrayOf2Bytes(dateAsInt))
-
-        // CRC32-Checksum, TODO: size bigger than 2GB
-        zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
-
-        // TODO: Compressed size
-        zip.appendBytes(getByteArrayOf4Bytes(0))
-
-        // Uncompressed size
-        zip.appendBytes(getByteArrayOf4Bytes(file.length().toInt()))
-
-        // File name length
-        zip.appendBytes(getByteArrayOf2Bytes(file.name.length))
-
-        // Extra field length
-        zip.appendBytes(getByteArrayOf2Bytes(0))
-    }
-
-    /**
      * Write the central directory file header to the zip archive we are constructing
      *
      * @param file the file for which we write the central directory file header
@@ -150,6 +109,47 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
 
         // Comment
         zip.appendBytes(comment.encodeToByteArray())
+    }
+
+    /**
+     * This method writes the part of the header that is common for the
+     * local file header and the central directory header
+     *
+     * @param file the file for which we have to write the header
+     * */
+    private fun writeCommonHeader(file: File) {
+        val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
+        val zipCompressionMethod: ByteArray = byteArrayOf(0x08, 0x00)
+
+        zip.appendBytes(zipFlags)
+        zip.appendBytes(zipCompressionMethod)
+
+        // File modification time
+        var timeAsInt: Int = datetime.hour
+        timeAsInt = timeAsInt shl 6 xor datetime.minute
+        timeAsInt = timeAsInt shl 5 xor (datetime.second / 2)
+        zip.appendBytes(getByteArrayOf2Bytes(timeAsInt))
+
+        // File modification date
+        var dateAsInt: Int = datetime.year - 1980
+        dateAsInt = dateAsInt shl 4 xor datetime.monthValue
+        dateAsInt = dateAsInt shl 5 xor datetime.dayOfMonth
+        zip.appendBytes(getByteArrayOf2Bytes(dateAsInt))
+
+        // CRC32-Checksum, TODO: size bigger than 2GB
+        zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
+
+        // TODO: Compressed size
+        zip.appendBytes(getByteArrayOf4Bytes(0))
+
+        // Uncompressed size
+        zip.appendBytes(getByteArrayOf4Bytes(file.length().toInt()))
+
+        // File name length
+        zip.appendBytes(getByteArrayOf2Bytes(file.name.length))
+
+        // Extra field length
+        zip.appendBytes(getByteArrayOf2Bytes(0))
     }
 
     /**
