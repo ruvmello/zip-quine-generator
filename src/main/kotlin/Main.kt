@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
         print(token)
     }
 
-    val file = File("droste.jpg")
+    val file = File(inputFilePath)
     val zipper = ZIPArchiver("test.zip")
-    zipper.getLocalFileHeader(file.name, file.length().toInt())
+    zipper.getLocalFileHeader(file)
 }

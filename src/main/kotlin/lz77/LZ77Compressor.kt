@@ -2,12 +2,26 @@ package lz77
 
 import java.io.File
 
-// Look into LZ77 vs LZSS
+/**
+ * This class handles everything related to the LZ77 encoding part of the deflate algorithm.
+ * This is the LZSS version of the LZ77 algorithm where we don't include the next character in a repeat token.
+ *
+ * @param windowSize is the sliding window in which we search for the longest repeated occurence
+ * @param lookaheadBufferSize is how far we look ahead from the current index
+ */
 class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookaheadBufferSize: Int = 258) {
 
-    fun compress(inputFilePath: String, minlength: Int = 1): List<LZ77Token> {
+    /**
+     * Transform the input data to a list of LZ77Token's
+     *
+     * @param inputFilePath the file path of the file we need to encode
+     * @param minlength the minimum length of a match in the longest repeated occurrence (less than three is not really compressing)
+     * @return a list of LZ77Token's that encodes the input data
+     */
+    fun compress(inputFilePath: String, minlength: Int = 3): List<LZ77Token> {
         val inputFile = File(inputFilePath)
-        val inputBytes = inputFile.readBytes()
+        // TODO: Also make it possible to handle files bigger than 2GB
+        val inputBytes: ByteArray = inputFile.readBytes()
 
         val compressedTokens: MutableList<LZ77Token> = mutableListOf()
         var currentIndex = 0
@@ -27,6 +41,14 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
         return compressedTokens
     }
 
+    /**
+     * Find the longest match inside the sliding window
+     *
+     * @param inputBytes the input data
+     * @param currentIndex the current position inside the input data
+     * @return a tuple that contains the length of the longest match
+     *         and the offset relative to the current position where the match starts
+     */
     fun findLongestRepeatedOccurenceInWindow(inputBytes: ByteArray, currentIndex: Int): Pair<Int, Int> {
         var maxMatchLength = 0
         var maxMatchOffset = 0
