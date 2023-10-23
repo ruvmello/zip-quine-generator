@@ -17,7 +17,7 @@ fun main(args: Array<String>) {
         print(token)
     }
 
-    val zipper = ZIPArchiver("twee.zip")
+    val zipper = ZIPArchiver("test.zip")
     val compressedStream = zipper.getDeflateStream(file)
     zipper.getLocalFileHeader(file, compressedStream.size)
     zipper.zip.appendBytes(compressedStream)

@@ -86,13 +86,13 @@ class HuffmanCompressor {
             if (code in 256..279) {
                 // 7 bits
                 byte = (byte shl 7) xor ((code shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
-                byte = (byte shl extraBits) xor (token.length - base!!) // Add extra bits
+                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
                 totalBitsSet += 7 + extraBits
 
             } else if (code in 280..287) {
                 // 8 bits
                 byte = (byte shl 8) xor code.toByte().toInt()   // Cut off 24 most significant bits
-                byte = (byte shl extraBits) xor (token.length - base!!) // Add extra bits
+                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
                 totalBitsSet += 8 + extraBits
             }
 
@@ -101,7 +101,7 @@ class HuffmanCompressor {
             code = distanceMapStaticHuffman[base]!!.first
             extraBits = distanceMapStaticHuffman[base]!!.second
             byte = (byte shl 5) xor ((code shl 3).toByte().toInt() shr 3)   // Cut off 27 most significant bits
-            byte = (byte shl extraBits) xor (token.offset - base!!) // Add extra bits
+            byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
             totalBitsSet += 5 + extraBits
 
             encoded.addAll(getListOfNBytes(byte, totalBitsSet))
