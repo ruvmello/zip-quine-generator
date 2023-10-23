@@ -1,5 +1,9 @@
 package zip
 
+import huffman.HuffmanCompressor
+import lz77.LZ77Compressor
+import utils.getByteArrayOf2Bytes
+import utils.getByteArrayOf4Bytes
 import java.io.File
 import java.time.LocalDateTime
 
@@ -17,7 +21,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
      *
      * @param file the file for which we write the local file header
      */
-    fun getLocalFileHeader(file: File) {
+    fun getLocalFileHeader(file: File, compressedSize: Int) {
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x03, 0x04)
         val zipVersion: ByteArray = byteArrayOf(0x14, 0x00)
@@ -25,7 +29,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         zip.writeBytes(zipSignature)
         zip.appendBytes(zipVersion)
 
-        this.writeCommonHeader(file)
+        this.writeCommonHeader(file, compressedSize)
 
         // File name
         zip.appendBytes(file.name.encodeToByteArray())
@@ -34,12 +38,23 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         // zip.appendBytes(getByteArrayOf2Bytes(0))
     }
 
+    fun getDeflateStream(file: File): ByteArray {
+        // Get tokens
+        val lz77 = LZ77Compressor()
+        val tokens = lz77.compress(file)
+
+        // Encode
+        val huffman = HuffmanCompressor()
+        val output = huffman.encode(tokens)
+        return output
+    }
+
     /**
      * Write the central directory file header to the zip archive we are constructing
      *
      * @param file the file for which we write the central directory file header
      */
-    fun getCentralDirectoryFileHeader(file: File) {
+    fun getCentralDirectoryFileHeader(file: File, compressedSize: Int) {
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x01, 0x02)   // Other than local file header signature
         val zipVersionMadeBy: ByteArray = byteArrayOf(0x14, 0x00)
@@ -49,14 +64,14 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         zip.appendBytes(zipVersionMadeBy)
         zip.appendBytes(zipVersionNeededToExtract)
 
-        this.writeCommonHeader(file)
+        this.writeCommonHeader(file, compressedSize)
 
         val comment = ""
 
         // File comment length
         zip.appendBytes(getByteArrayOf2Bytes(comment.length))
 
-        // Number of disk TODO: How?
+        // Number of disk
         zip.appendBytes(getByteArrayOf2Bytes(0))
 
         // Internal attributes, https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -117,7 +132,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
      *
      * @param file the file for which we have to write the header
      * */
-    private fun writeCommonHeader(file: File) {
+    private fun writeCommonHeader(file: File, compressedSize: Int) {
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
         val zipCompressionMethod: ByteArray = byteArrayOf(0x08, 0x00)
 
@@ -140,7 +155,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
 
         // TODO: Compressed size
-        zip.appendBytes(getByteArrayOf4Bytes(0))
+        zip.appendBytes(getByteArrayOf4Bytes(compressedSize))
 
         // Uncompressed size
         zip.appendBytes(getByteArrayOf4Bytes(file.length().toInt()))
@@ -150,24 +165,6 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
 
         // Extra field length
         zip.appendBytes(getByteArrayOf2Bytes(0))
-    }
-
-    /**
-     * An integer has a size of 32 bits, get a ByteArray of the two least significant bytes
-     *
-     * @param input the integer for which we construct a ByteArray of size two
-     */
-    private fun getByteArrayOf2Bytes(input: Int): ByteArray {
-        return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte())
-    }
-
-    /**
-     * An integer has a size of 32 bits, get a ByteArray of the size four with the least significant byte first
-     *
-     * @param input the integer for which we construct a ByteArray of size four
-     */
-    private fun getByteArrayOf4Bytes(input: Int): ByteArray {
-        return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte(), (input shr 16).toByte(), (input shr 24).toByte())
     }
 
     /**

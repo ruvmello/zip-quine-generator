@@ -9,19 +9,18 @@ import java.io.File
  * @param windowSize is the sliding window in which we search for the longest repeated occurence
  * @param lookaheadBufferSize is how far we look ahead from the current index
  */
-class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookaheadBufferSize: Int = 258) {
+class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookaheadBufferSize: Int = 258) { // 258 because match is between (3, 258), which can be stored in one byte
 
     /**
      * Transform the input data to a list of LZ77Token's
      *
-     * @param inputFilePath the file path of the file we need to encode
+     * @param file the file we need to encode
      * @param minlength the minimum length of a match in the longest repeated occurrence (less than three is not really compressing)
      * @return a list of LZ77Token's that encodes the input data
      */
-    fun compress(inputFilePath: String, minlength: Int = 3): List<LZ77Token> {
-        val inputFile = File(inputFilePath)
+    fun compress(file: File, minlength: Int = 3): List<LZ77Token> {
         // TODO: Also make it possible to handle files bigger than 2GB
-        val inputBytes: ByteArray = inputFile.readBytes()
+        val inputBytes: ByteArray = file.readBytes()
 
         val compressedTokens: MutableList<LZ77Token> = mutableListOf()
         var currentIndex = 0

@@ -1,6 +1,7 @@
 import lz77.LZ77Compressor
 import lz77.LZ77Repeat
 import org.testng.annotations.Test
+import java.io.File
 
 class LZ77Test {
     private val path = "src/test/resources/"
@@ -10,7 +11,7 @@ class LZ77Test {
         val windowSize = 32 * 1024 // Adjust the window size as needed
         val lookaheadBufferSize = 258 // Adjust the lookahead buffer size as needed
         val lz77 = LZ77Compressor(windowSize = windowSize, lookaheadBufferSize = lookaheadBufferSize)
-        val compressedTokens = lz77.compress(inputFilePath)
+        val compressedTokens = lz77.compress(File(inputFilePath))
 
         // Print the compressed tokens
         for (token in compressedTokens) {
@@ -28,7 +29,7 @@ class LZ77Test {
         val windowSize = 32 * 1024 // Adjust the window size as needed
         val lookaheadBufferSize = 258 // Adjust the lookahead buffer size as needed
         val lz77 = LZ77Compressor(windowSize = windowSize, lookaheadBufferSize = lookaheadBufferSize)
-        val compressedTokens = lz77.compress(inputFilePath, minlength = 3)
+        val compressedTokens = lz77.compress(File(inputFilePath))
 
         // Print the compressed tokens
         for (token in compressedTokens) {
