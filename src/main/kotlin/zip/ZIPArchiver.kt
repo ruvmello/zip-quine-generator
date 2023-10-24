@@ -194,7 +194,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
 
         var crc32 = 0xFFFFFFFF.toInt()
         for (byte in byteArray) {
-            val index = (crc32 and 0xFF) xor byte.toInt()
+            val index = (crc32 and 0xFF) xor byte.toUByte().toInt()
             crc32 = (crc32 ushr 8) xor crc32Table[index]
         }
 

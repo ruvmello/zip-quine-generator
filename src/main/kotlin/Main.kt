@@ -5,11 +5,16 @@ import java.io.File
 fun main(args: Array<String>) {
     println("Program arguments: ${args.joinToString()}")
 
+    assert(args.size == 3) { "The arguments must have the format [inputFile] -o [outputFile]" }
+
     val inputFilePath = args[0]
+
+    var outputFilePath: String? = null
+    if (args[1] == "-o")
+        outputFilePath = args[2]
+
     val file = File(inputFilePath)
-    val windowSize = 32 * 1024 // Adjust the window size as needed
-    val lookaheadBufferSize = 258 // Adjust the lookahead buffer size as needed
-    val lz77 = LZ77Compressor(windowSize = windowSize, lookaheadBufferSize = lookaheadBufferSize)
+    val lz77 = LZ77Compressor()
     val compressedTokens = lz77.compress(file)
 
     // Print the compressed tokens
@@ -17,7 +22,7 @@ fun main(args: Array<String>) {
         print(token)
     }
 
-    val zipper = ZIPArchiver("test.zip")
+    val zipper = ZIPArchiver(outputFilePath!!)
     val compressedStream = zipper.getDeflateStream(file)
     zipper.getLocalFileHeader(file, compressedStream.size)
     zipper.zip.appendBytes(compressedStream)
