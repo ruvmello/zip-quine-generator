@@ -23,6 +23,16 @@ fun getListOfNBytes(input: Int, n: Int): List<Byte> {
     val totalBytes = n / 8
     val bytes = mutableListOf<Byte>()
     for (i in 1 ..  totalBytes) {
+        bytes.add((input shr (n - 8 * i)).toByte())
+    }
+    return bytes
+}
+
+fun getListOfNReversedBytes(input: Int, n: Int): List<Byte> {
+
+    val totalBytes = n / 8
+    val bytes = mutableListOf<Byte>()
+    for (i in 1 ..  totalBytes) {
         bytes.add(reverseBits((input shr (n - 8 * i)).toByte()))
     }
     return bytes

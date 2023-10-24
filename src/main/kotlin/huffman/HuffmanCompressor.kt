@@ -10,6 +10,9 @@ import utils.*
  */
 class HuffmanCompressor {
 
+    private var byte: Int = 0
+    private var totalBitsSet: Int = 0
+
     /**
      * Encode the [tokens] using the Huffman part of the DEFLATE algorithm
      *
@@ -54,30 +57,37 @@ class HuffmanCompressor {
 
     fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
         // First bit
-        var firstByte: Int = if (isLast) 1 else 0
+        byte = byte shl 1 xor (if (isLast) 1 else 0)
 
         // Block type, 00 for stored
-        firstByte = firstByte shl 2
+        byte = byte shl 2
+
+        totalBitsSet += 3
 
         // Padding first byte
-        firstByte = firstByte shl 5
+        val totalBytesSet = totalBitsSet / 8
+        byte = byte shl (8 - totalBitsSet - totalBytesSet * 8)
+        totalBitsSet += (8 - totalBitsSet - totalBytesSet * 8)
 
         val len = literal.size
+        val outputBytes = getListOfNReversedBytes(byte, totalBitsSet).toByteArray()
+        byte = 0
+        totalBitsSet = 0
 
-        return byteArrayOf(firstByte.toByte()) + getByteArrayOf2Bytes(len) +
+        return outputBytes + getByteArrayOf2Bytes(len) +
                 getByteArrayOf2Bytes(len.inv()) + literal.map { it.char }.toByteArray()
     }
 
     fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
         val encoded = mutableListOf<Byte>()
         // First bit
-        var byte: Int = if (isLast) 1 else 0
+        byte = byte shl 1 xor (if (isLast) 1 else 0)
 
         // Block type, 01 for static (but it is read from right-to-left, so xor 2)
         byte = byte shl 2 xor 2
 
-        var totalBitsSet = 3
-
+        totalBitsSet += 3
+        // TODO: One loop can exceed the 32 bits of an integer, so add bytes faster
         for (token in tokens) {
             // Length
             var base = lengthMapStaticHuffman.keys.findLast { token.length >= it }
@@ -86,13 +96,13 @@ class HuffmanCompressor {
             if (code in 256..279) {
                 // 7 bits
                 byte = (byte shl 7) xor ((code shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
-                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
+                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
                 totalBitsSet += 7 + extraBits
 
             } else if (code in 280..287) {
                 // 8 bits
                 byte = (byte shl 8) xor code.toByte().toInt()   // Cut off 24 most significant bits
-                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
+                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
                 totalBitsSet += 8 + extraBits
             }
 
@@ -101,28 +111,24 @@ class HuffmanCompressor {
             code = distanceMapStaticHuffman[base]!!.first
             extraBits = distanceMapStaticHuffman[base]!!.second
             byte = (byte shl 5) xor ((code shl 3).toByte().toInt() shr 3)   // Cut off 27 most significant bits
-            byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits
+            byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
             totalBitsSet += 5 + extraBits
 
-            encoded.addAll(getListOfNBytes(byte, totalBitsSet))
+            encoded.addAll(getListOfNReversedBytes(byte, totalBitsSet))
             val totalFullBytes = totalBitsSet / 8   // Integer division
             totalBitsSet -= totalFullBytes * 8
-            byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)
+            byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)    // Reset to only the set bits
         }
 
-        // Zero padding to byte boundary
-        if (totalBitsSet > 0) {
-            byte = byte shl (8 - totalBitsSet)
-            encoded.add(reverseBits(byte.toByte()))
-        }
+        // End of block marker
+        byte = (byte shl 7) xor ((256 shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
+        totalBitsSet += 7
 
-        // End of block marker is 7 bits of 0,
-        // If the padding is not already 7 bits,
-        // add another byte of 0
-        if (8 - totalBitsSet != 7) {
-            byte = 0
-            encoded.add(byte.toByte())
-        }
+        encoded.addAll(getListOfNReversedBytes(byte, totalBitsSet))
+        val totalFullBytes = totalBitsSet / 8   // Integer division
+        totalBitsSet -= totalFullBytes * 8
+        byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)    // Reset to only the set bits
+
         return encoded.toByteArray()
     }
 
