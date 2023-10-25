@@ -52,6 +52,12 @@ class HuffmanCompressor {
             literals.clear()
         }
 
+        if (totalBitsSet != 0) {
+            byte = byte shl (8 - totalBitsSet)
+            totalBitsSet += (8 - totalBitsSet)
+            outputBytes += getBytesAndReset()
+        }
+
         return outputBytes
     }
 
@@ -87,7 +93,6 @@ class HuffmanCompressor {
         byte = byte shl 2 xor 2
 
         totalBitsSet += 3
-        // TODO: One loop can exceed the 32 bits of an integer, so add bytes faster
         for (token in tokens) {
             // Length
             var base = lengthMapStaticHuffman.keys.findLast { token.length >= it }
@@ -106,30 +111,41 @@ class HuffmanCompressor {
                 totalBitsSet += 8 + extraBits
             }
 
+            encoded.addAll(getBytesAndReset())
+
             // Distance, base is always 5 bits
             base = distanceMapStaticHuffman.keys.findLast { token.offset >= it }
             code = distanceMapStaticHuffman[base]!!.first
             extraBits = distanceMapStaticHuffman[base]!!.second
             byte = (byte shl 5) xor ((code shl 3).toByte().toInt() shr 3)   // Cut off 27 most significant bits
-            byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+            byte = (byte shl extraBits) xor reverseBits(((token.offset - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
             totalBitsSet += 5 + extraBits
 
-            encoded.addAll(getListOfNReversedBytes(byte, totalBitsSet))
-            val totalFullBytes = totalBitsSet / 8   // Integer division
-            totalBitsSet -= totalFullBytes * 8
-            byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)    // Reset to only the set bits
+            encoded.addAll(getBytesAndReset())
         }
 
-        // End of block marker
+        // End of block marker (256 - 7 bits)
         byte = (byte shl 7) xor ((256 shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
         totalBitsSet += 7
 
-        encoded.addAll(getListOfNReversedBytes(byte, totalBitsSet))
+        encoded.addAll(getBytesAndReset())
+
+        return encoded.toByteArray()
+    }
+
+    /**
+     * Get the full bytes that are set and reset the integer to only have the not full byte at the beginning
+     * Example: 00000100 01000100 10101110 00110010 with 27 bits set
+     *          -> 00000000 00000000 00000000 00010010
+     *
+     * @return the bytes that are fully set
+     */
+    private fun getBytesAndReset(): List<Byte> {
+        val output = getListOfNReversedBytes(byte, totalBitsSet)
         val totalFullBytes = totalBitsSet / 8   // Integer division
         totalBitsSet -= totalFullBytes * 8
         byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)    // Reset to only the set bits
-
-        return encoded.toByteArray()
+        return output
     }
 
     /**
