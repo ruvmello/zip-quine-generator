@@ -71,12 +71,11 @@ class HuffmanCompressor {
         totalBitsSet += 3
 
         // Padding first byte
-        val totalBytesSet = totalBitsSet / 8
-        byte = byte shl (8 - totalBitsSet - totalBytesSet * 8)
-        totalBitsSet += (8 - totalBitsSet - totalBytesSet * 8)
+        byte = byte shl (8 - totalBitsSet % 8)
+        totalBitsSet += (8 - totalBitsSet % 8)
 
         val len = literal.size
-        val outputBytes = getListOfNReversedBytes(byte, totalBitsSet).toByteArray()
+        val outputBytes = getBytesAndReset().toByteArray()
         byte = 0
         totalBitsSet = 0
 
@@ -125,7 +124,7 @@ class HuffmanCompressor {
         }
 
         // End of block marker (256 - 7 bits)
-        byte = (byte shl 7) xor ((256 shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
+        byte = byte shl 7 // First 7 bits of 256 are just 0, so shift 7 is enough
         totalBitsSet += 7
 
         encoded.addAll(getBytesAndReset())
