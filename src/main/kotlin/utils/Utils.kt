@@ -33,12 +33,12 @@ fun getListOfNReversedBytes(input: Int, n: Int): List<Byte> {
     val totalBytes = n / 8
     val bytes = mutableListOf<Byte>()
     for (i in 1 ..  totalBytes) {
-        bytes.add(reverseBits((input shr (n - 8 * i)).toByte()))
+        bytes.add(reverseBitsByte((input shr (n - 8 * i)).toByte()))
     }
     return bytes
 }
 
-fun reverseBits(byte: Byte): Byte {
+fun reverseBitsByte(byte: Byte): Byte {
     var result = 0
     var input = byte.toInt()
 
@@ -48,6 +48,18 @@ fun reverseBits(byte: Byte): Byte {
     }
 
     return result.toByte()
+}
+
+fun reverseBitsInt(int: Int): Int {
+    var result = 0
+    var input = int
+
+    for (i in 0 until 32) {
+        result = (result shl 1) or (input and 1)
+        input = input ushr 1
+    }
+
+    return result
 }
 
 // Mapping of length base to code

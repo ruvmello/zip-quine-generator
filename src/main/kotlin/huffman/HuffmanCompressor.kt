@@ -99,25 +99,30 @@ class HuffmanCompressor {
             var extraBits = lengthMapStaticHuffman[base]!!.second
             if (code in 256..279) {
                 // 7 bits
-                byte = (byte shl 7) xor ((code shl 1).toByte().toInt() shr 1)   // Cut off 25 most significant bits
-                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                byte = (byte shl 7) xor ((code shl 1).toUByte().toInt() shr 1)   // Cut off 25 most significant bits
+                byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toByte()).toUByte().toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
                 totalBitsSet += 7 + extraBits
 
             } else if (code in 280..287) {
                 // 8 bits
-                byte = (byte shl 8) xor code.toByte().toInt()   // Cut off 24 most significant bits
-                byte = (byte shl extraBits) xor reverseBits(((token.length - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                byte = (byte shl 8) xor code.toUByte().toInt()   // Cut off 24 most significant bits
+                byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toByte()).toUByte().toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
                 totalBitsSet += 8 + extraBits
             }
 
             encoded.addAll(getBytesAndReset())
 
             // Distance, base is always 5 bits
-            base = distanceMapStaticHuffman.keys.findLast { token.offset >= it }
+            base = distanceMapStaticHuffman.keys.findLast { token.distance >= it }
             code = distanceMapStaticHuffman[base]!!.first
             extraBits = distanceMapStaticHuffman[base]!!.second
-            byte = (byte shl 5) xor ((code shl 3).toByte().toInt() shr 3)   // Cut off 27 most significant bits
-            byte = (byte shl extraBits) xor reverseBits(((token.offset - base!!) shl (8 - extraBits)).toByte()).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+            byte = (byte shl 5) xor ((code shl 3).toUByte().toInt() shr 3)   // Cut off 27 most significant bits
+
+            // Example: 00000000 00000000 00000001 00000011 ->
+            //          (reversed) 11000000 10000000 00000000 00000000 ->
+            //          (shiftRight 32 - extraBits) 00000000 00000000 00000001 10000001
+            val extraValue = reverseBitsInt(token.distance - base!!).toUInt()
+            byte = (byte shl extraBits) xor (extraValue shr (32 - extraBits)).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
             totalBitsSet += 5 + extraBits
 
             encoded.addAll(getBytesAndReset())

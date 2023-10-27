@@ -19,7 +19,7 @@ class LZ77Test {
         }
         assert(compressedTokens.size == 8)
         assert(compressedTokens[6] is LZ77Repeat)
-        assert((compressedTokens[6] as LZ77Repeat).offset == 5)
+        assert((compressedTokens[6] as LZ77Repeat).distance == 5)
         assert((compressedTokens[6] as LZ77Repeat).length == 18)
     }
 
@@ -41,7 +41,7 @@ class LZ77Test {
         var index = 0
         for (i in compressedTokens.indices) {
             if (compressedTokens[i] is LZ77Repeat){
-                assert((compressedTokens[i] as LZ77Repeat).offset == right_offsets[index])
+                assert((compressedTokens[i] as LZ77Repeat).distance == right_offsets[index])
                 assert((compressedTokens[i] as LZ77Repeat).length == right_lengths[index])
                 index++
             }
