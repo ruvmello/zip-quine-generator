@@ -1,44 +1,44 @@
 package utils
 
 /**
- * An integer has a size of 32 bits, get a ByteArray of the two least significant bytes
+ * An integer has a size of 32 bits, get a UByteArray of the two least significant bytes
  *
- * @param input the integer for which we construct a ByteArray of size two
+ * @param input the integer for which we construct a UByteArray of size two
  */
 fun getByteArrayOf2Bytes(input: Int): ByteArray {
     return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte())
 }
 
 /**
- * An integer has a size of 32 bits, get a ByteArray of the size four with the least significant byte first
+ * An integer has a size of 32 bits, get a UByteArray of the size four with the least significant byte first
  *
- * @param input the integer for which we construct a ByteArray of size four
+ * @param input the integer for which we construct a UByteArray of size four
  */
 fun getByteArrayOf4Bytes(input: Int): ByteArray {
     return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte(), (input shr 16).toByte(), (input shr 24).toByte())
 }
 
-fun getListOfNBytes(input: Int, n: Int): List<Byte> {
+fun getListOfNBytes(input: Int, n: Int): List<UByte> {
 
-    val totalBytes = n / 8
-    val bytes = mutableListOf<Byte>()
-    for (i in 1 ..  totalBytes) {
-        bytes.add((input shr (n - 8 * i)).toByte())
+    val totalUBytes = n / 8
+    val bytes = mutableListOf<UByte>()
+    for (i in 1 ..  totalUBytes) {
+        bytes.add((input shr (n - 8 * i)).toUByte())
     }
     return bytes
 }
 
-fun getListOfNReversedBytes(input: Int, n: Int): List<Byte> {
+fun getListOfNReversedBytes(input: UInt, n: Int): List<UByte> {
 
-    val totalBytes = n / 8
-    val bytes = mutableListOf<Byte>()
-    for (i in 1 ..  totalBytes) {
-        bytes.add(reverseBitsByte((input shr (n - 8 * i)).toByte()))
+    val totalUBytes = n / 8
+    val bytes = mutableListOf<UByte>()
+    for (i in 1 ..  totalUBytes) {
+        bytes.add(reverseBitsByte((input shr (n - 8 * i)).toUByte()))
     }
     return bytes
 }
 
-fun reverseBitsByte(byte: Byte): Byte {
+fun reverseBitsByte(byte: UByte): UByte {
     var result = 0
     var input = byte.toInt()
 
@@ -47,7 +47,7 @@ fun reverseBitsByte(byte: Byte): Byte {
         input = input ushr 1
     }
 
-    return result.toByte()
+    return result.toUByte()
 }
 
 fun reverseBitsInt(int: Int): Int {

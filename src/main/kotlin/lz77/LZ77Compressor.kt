@@ -32,7 +32,7 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
                 compressedTokens.add(LZ77Repeat(maxMatchOffset, maxMatchLength))
                 currentIndex += maxMatchLength
             } else {
-                compressedTokens.add(LZ77Literal(inputBytes[currentIndex]))
+                compressedTokens.add(LZ77Literal(inputBytes[currentIndex].toUByte()))
                 currentIndex++
             }
         }

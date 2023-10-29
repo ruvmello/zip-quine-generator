@@ -1,3 +1,3 @@
 package huffman
 
-class LeafNode(val symbol: Byte, override var weight: Int = 0): Node
+class LeafNode(val symbol: UByte, override var weight: Int = 0): Node

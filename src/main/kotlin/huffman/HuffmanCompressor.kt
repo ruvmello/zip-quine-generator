@@ -10,7 +10,7 @@ import utils.*
  */
 class HuffmanCompressor {
 
-    private var byte: Int = 0
+    private var byte: UInt = 0u
     private var totalBitsSet: Int = 0
 
     /**
@@ -55,7 +55,7 @@ class HuffmanCompressor {
         if (totalBitsSet != 0) {
             byte = byte shl (8 - totalBitsSet)
             totalBitsSet += (8 - totalBitsSet)
-            outputBytes += getBytesAndReset()
+            outputBytes += getBytesAndReset().map { it.toByte() }.toByteArray()
         }
 
         return outputBytes
@@ -63,33 +63,35 @@ class HuffmanCompressor {
 
     fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
         // First bit
-        byte = byte shl 1 xor (if (isLast) 1 else 0)
+        byte = byte shl 1 xor (if (isLast) 1u else 0u)
 
         // Block type, 00 for stored
         byte = byte shl 2
 
         totalBitsSet += 3
 
-        // Padding first byte
-        byte = byte shl (8 - totalBitsSet % 8)
-        totalBitsSet += (8 - totalBitsSet % 8)
+        // Padding
+        if (totalBitsSet % 8 != 0) {
+            byte = byte shl (8 - totalBitsSet % 8)
+            totalBitsSet += (8 - totalBitsSet % 8)
+        }
 
         val len = literal.size
-        val outputBytes = getBytesAndReset().toByteArray()
-        byte = 0
+        val outputBytes = getBytesAndReset().map { it.toByte() }.toByteArray()
+        byte = 0u
         totalBitsSet = 0
 
         return outputBytes + getByteArrayOf2Bytes(len) +
-                getByteArrayOf2Bytes(len.inv()) + literal.map { it.char }.toByteArray()
+                getByteArrayOf2Bytes(len.inv()) + literal.map { it.char.toByte() }.toByteArray()
     }
 
     fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
-        val encoded = mutableListOf<Byte>()
+        val encoded = mutableListOf<UByte>()
         // First bit
-        byte = byte shl 1 xor (if (isLast) 1 else 0)
+        byte = byte shl 1 xor (if (isLast) 1u else 0u)
 
         // Block type, 01 for static (but it is read from right-to-left, so xor 2)
-        byte = byte shl 2 xor 2
+        byte = byte shl 2 xor 2u
 
         totalBitsSet += 3
         for (token in tokens) {
@@ -99,14 +101,22 @@ class HuffmanCompressor {
             var extraBits = lengthMapStaticHuffman[base]!!.second
             if (code in 256..279) {
                 // 7 bits
-                byte = (byte shl 7) xor ((code shl 1).toUByte().toInt() shr 1)   // Cut off 25 most significant bits
-                byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toByte()).toUByte().toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                byte = (byte shl 7) xor ((code shl 1).toUByte().toUInt() shr 1)   // Cut off 25 most significant bits
+
+                if (extraBits > 0) {
+                    byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toUByte()).toUInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                }
+
                 totalBitsSet += 7 + extraBits
 
             } else if (code in 280..287) {
                 // 8 bits
-                byte = (byte shl 8) xor code.toUByte().toInt()   // Cut off 24 most significant bits
-                byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toByte()).toUByte().toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                byte = (byte shl 8) xor ((code - 88).toUByte().toUInt())   // Cut off 24 most significant bits and subtract 88 (the bits are 11000000 through 11000111) (see RFC1951, section 3.2.6.)
+
+                if (extraBits > 0) {
+                    byte = (byte shl extraBits) xor reverseBitsByte(((token.length - base!!) shl (8 - extraBits)).toUByte()).toUInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+                }
+
                 totalBitsSet += 8 + extraBits
             }
 
@@ -116,13 +126,15 @@ class HuffmanCompressor {
             base = distanceMapStaticHuffman.keys.findLast { token.distance >= it }
             code = distanceMapStaticHuffman[base]!!.first
             extraBits = distanceMapStaticHuffman[base]!!.second
-            byte = (byte shl 5) xor ((code shl 3).toUByte().toInt() shr 3)   // Cut off 27 most significant bits
+            byte = (byte shl 5) xor ((code shl 3).toUByte().toUInt() shr 3)   // Cut off 27 most significant bits
 
-            // Example: 00000000 00000000 00000001 00000011 ->
-            //          (reversed) 11000000 10000000 00000000 00000000 ->
-            //          (shiftRight 32 - extraBits) 00000000 00000000 00000001 10000001
-            val extraValue = reverseBitsInt(token.distance - base!!).toUInt()
-            byte = (byte shl extraBits) xor (extraValue shr (32 - extraBits)).toInt() // Add extra bits, extra bits are in MSB-order (reverseBits)
+            if (extraBits > 0) {
+                // Example: 00000000 00000000 00000001 00000011 ->
+                //          (reversed) 11000000 10000000 00000000 00000000 ->
+                //          (shiftRight 32 - extraBits) 00000000 00000000 00000001 10000001
+                val extraValue = reverseBitsInt(token.distance - base!!).toUInt()
+                byte = (byte shl extraBits) xor (extraValue shr (32 - extraBits)) // Add extra bits, extra bits are in MSB-order (reverseBits)
+            }
             totalBitsSet += 5 + extraBits
 
             encoded.addAll(getBytesAndReset())
@@ -134,7 +146,7 @@ class HuffmanCompressor {
 
         encoded.addAll(getBytesAndReset())
 
-        return encoded.toByteArray()
+        return encoded.map { it.toByte() }.toByteArray()
     }
 
     /**
@@ -144,11 +156,11 @@ class HuffmanCompressor {
      *
      * @return the bytes that are fully set
      */
-    private fun getBytesAndReset(): List<Byte> {
+    private fun getBytesAndReset(): List<UByte> {
         val output = getListOfNReversedBytes(byte, totalBitsSet)
         val totalFullBytes = totalBitsSet / 8   // Integer division
         totalBitsSet -= totalFullBytes * 8
-        byte = (byte shl (8 - totalBitsSet)).toByte().toInt() shr (8 - totalBitsSet)    // Reset to only the set bits
+        byte = (byte shl (8 - totalBitsSet)).toUByte().toUInt() shr (8 - totalBitsSet)    // Reset to only the set bits
         return output
     }
 
@@ -158,8 +170,8 @@ class HuffmanCompressor {
      * @param tokens the tokens for which we calculate the frequencies
      * @return a map that contains the frequency for each byte that was in [tokens]
      */
-    fun computeFrequencies(tokens: List<LZ77Token>): MutableMap<Byte, Int> {
-        val freq: MutableMap<Byte, Int> = mutableMapOf()
+    fun computeFrequencies(tokens: List<LZ77Token>): MutableMap<UByte, Int> {
+        val freq: MutableMap<UByte, Int> = mutableMapOf()
         for (token in tokens){
             if (token is LZ77Literal) {
                 val byte = token.char
@@ -176,7 +188,7 @@ class HuffmanCompressor {
      * @param freq the frequencies that are calculated for each byte in the input data
      * @return the root of the huffman tree
      */
-    fun buildTree(freq: Map<Byte, Int>): CompositeNode {
+    fun buildTree(freq: Map<UByte, Int>): CompositeNode {
         val nodes: MutableList<Node> = freq.entries.map { (byte, weight) -> LeafNode(byte, weight) }.toMutableList()
 
         while (nodes.size != 1) {
