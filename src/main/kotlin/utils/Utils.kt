@@ -18,16 +18,6 @@ fun getByteArrayOf4Bytes(input: Int): ByteArray {
     return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte(), (input shr 16).toByte(), (input shr 24).toByte())
 }
 
-fun getListOfNBytes(input: Int, n: Int): List<UByte> {
-
-    val totalUBytes = n / 8
-    val bytes = mutableListOf<UByte>()
-    for (i in 1 ..  totalUBytes) {
-        bytes.add((input shr (n - 8 * i)).toUByte())
-    }
-    return bytes
-}
-
 fun getListOfNReversedBytes(input: UInt, n: Int): List<UByte> {
 
     val totalUBytes = n / 8
