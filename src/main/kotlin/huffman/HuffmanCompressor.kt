@@ -10,7 +10,14 @@ import utils.*
  */
 class HuffmanCompressor {
 
+    /**
+     * This (unsigned) integer is where we do the bit operations.
+     */
     private var byte: UInt = 0u
+
+    /**
+     * This integer indicates how many bits there are set until now.
+     */
     private var totalBitsSet: Int = 0
 
     /**
@@ -61,6 +68,18 @@ class HuffmanCompressor {
         return outputBytes
     }
 
+    /**
+     * Encode the literals in a stored block.
+     * A stored block has the first bit 0 or 1 indicating that it is the last block or not.
+     * The 2nd and 3rd bit indicate the type of block, for a stored block this is 00.
+     * Next, there is some padding till the byte boundary, note that this is not always 5 bits,
+     * because a non-stored block can end in the middle of a byte.
+     * After the byte boundary, the literal bytes are followed one by one.
+     *
+     * @param literal's that need to be encoded in a stored block
+     * @param isLast specifies if the first bit of the block is 1 or 0
+     * @return the encoded data in a ByteArray
+     */
     fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)
@@ -85,6 +104,16 @@ class HuffmanCompressor {
                 getByteArrayOf2Bytes(len.inv()) + literal.map { it.char.toByte() }.toByteArray()
     }
 
+    /**
+     * Encode the repeats in static huffman blocks.
+     * The first bit indicates if the block is the last block.
+     * The 2nd and 3rd bit indicate the type of block, which is 01.
+     * But it is read from most-significant-bit to least-significant-bit.
+     *
+     * @param tokens that need to be encoded in a static huffman block
+     * @param isLast specifies if the first bit of the block is 1 or 0
+     * @return the encoded data in a ByteArray
+     */
     fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
         val encoded = mutableListOf<UByte>()
         // First bit

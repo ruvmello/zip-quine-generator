@@ -4,6 +4,7 @@ package utils
  * An integer has a size of 32 bits, get a UByteArray of the two least significant bytes
  *
  * @param input the integer for which we construct a UByteArray of size two
+ * @return the bytearray of size two
  */
 fun getByteArrayOf2Bytes(input: Int): ByteArray {
     return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte())
@@ -13,11 +14,20 @@ fun getByteArrayOf2Bytes(input: Int): ByteArray {
  * An integer has a size of 32 bits, get a UByteArray of the size four with the least significant byte first
  *
  * @param input the integer for which we construct a UByteArray of size four
+ * @return the bytearray of size four
  */
 fun getByteArrayOf4Bytes(input: Int): ByteArray {
     return byteArrayOf((input shr 0).toByte(), (input shr 8).toByte(), (input shr 16).toByte(), (input shr 24).toByte())
 }
 
+/**
+ * Get the bytes inside the [input] and reverse the bit order.
+ * So change 1000 0000 to 0000 0001.
+ *
+ * @param input the integer for which we construct a UByteArray of size four
+ * @param n the total bits that are set
+ * @return list of the reversed bytes
+ */
 fun getListOfNReversedBytes(input: UInt, n: Int): List<UByte> {
 
     val totalUBytes = n / 8
@@ -28,6 +38,12 @@ fun getListOfNReversedBytes(input: UInt, n: Int): List<UByte> {
     return bytes
 }
 
+/**
+ * Reverse the bits of a byte, so change from LSB to MSB.
+ *
+ * @param byte the byte that needs to be reversed
+ * @return the reversed byte
+ */
 fun reverseBitsByte(byte: UByte): UByte {
     var result = 0
     var input = byte.toInt()
@@ -40,6 +56,12 @@ fun reverseBitsByte(byte: UByte): UByte {
     return result.toUByte()
 }
 
+/**
+ * Reverse the bits of an integer, so change from LSB to MSB.
+ *
+ * @param int the integer that needs to be reversed
+ * @return the reversed integer
+ */
 fun reverseBitsInt(int: Int): Int {
     var result = 0
     var input = int

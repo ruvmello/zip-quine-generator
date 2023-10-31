@@ -38,6 +38,12 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         // zip.appendBytes(getByteArrayOf2Bytes(0))
     }
 
+    /**
+     * Get the encoded stream for the file.
+     *
+     * @param file the file for which we want the deflate stream
+     * @return the bytes that need to be written
+     */
     fun getDeflateStream(file: File): ByteArray {
         // Get tokens
         val lz77 = LZ77Compressor()
@@ -53,6 +59,7 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
      * Write the central directory file header to the zip archive we are constructing
      *
      * @param file the file for which we write the central directory file header
+     * @param compressedSize the compressed size
      */
     fun getCentralDirectoryFileHeader(file: File, compressedSize: Int) {
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -96,6 +103,14 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
             zip.appendBytes(comment.encodeToByteArray())
     }
 
+    /**
+     * This method writes the part of the tail of a zip file.
+     * This part is called end of central directory.
+     *
+     * @param numberOfFiles the number of files that are in the zip
+     * @param size the size of the central directory
+     * @param offset of the start of the central directory on the disk on which the central directory starts
+     * */
     fun getEndOfCentralDirectoryRecord(numberOfFiles: Int, size: Int, offset: Int) {
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
         zip.appendBytes(zipSignature)
