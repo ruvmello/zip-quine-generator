@@ -1,34 +1,35 @@
-import lz77.LZ77Compressor
 import zip.ZIPArchiver
-import java.io.File
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
-    println("Program arguments: ${args.joinToString()}")
-
-    assert(args.size == 3) { "The arguments must have the format [inputFile] -o [outputFile]" }
-
-    val inputFilePath = args[0]
-
+    val arguments = args.toMutableList()
+    var inputFilePath: String? = null
     var outputFilePath: String? = null
-    if (args[1] == "-o")
-        outputFilePath = args[2]
-
-    val file = File(inputFilePath)
-    val lz77 = LZ77Compressor()
-    val compressedTokens = lz77.compress(file)
-
-    // Print the compressed tokens
-    for (token in compressedTokens) {
-        print(token)
+    var debug = false
+    while(arguments.isNotEmpty()) {
+        val option = arguments.removeAt(0)
+        when(option) {
+            "--help", "-h" -> {
+                println("This program aims to create a zip quine.")
+                println("The created zip contains the input file, as well as the zip itself.")
+                println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug]")
+                exitProcess(0)
+            }
+            "--output", "-o" -> outputFilePath = arguments.removeAt(0)
+            "--debug" -> debug = true
+            else -> inputFilePath = option
+        }
     }
 
-    val zipper = ZIPArchiver(outputFilePath!!)
-    val compressedStream = zipper.getDeflateStream(file)
-    zipper.getLocalFileHeader(file, compressedStream.size)
-    zipper.zip.appendBytes(compressedStream)
+    if (inputFilePath == null) {
+        println("There is no file given as input.")
+        println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug]")
+        exitProcess(0)
+    }
 
+    if (outputFilePath == null)
+        outputFilePath = inputFilePath.substringBeforeLast('.') + ".zip"
 
-    val offset = zipper.zip.length().toInt()
-    zipper.getCentralDirectoryFileHeader(file, compressedStream.size)
-    zipper.getEndOfCentralDirectoryRecord(1, zipper.zip.length().toInt() - offset, offset)
+    val archiver = ZIPArchiver(outputFilePath, debug)
+    archiver.createZipFile(inputFilePath)
 }

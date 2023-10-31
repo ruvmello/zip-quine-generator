@@ -12,9 +12,29 @@ import java.time.LocalDateTime
  *
  * @param zipName the file name to which we write the bytes
  */
-class ZIPArchiver(private val zipName: String = "test.zip") {
-    val zip = File(this.zipName)
+class ZIPArchiver(private val zipName: String = "test.zip", private val debug: Boolean = false) {
+    private val zip = File(this.zipName)
     private val datetime = LocalDateTime.now()
+
+    /**
+     * Create a zip archive of the [inputFilePath] file.
+     *
+     * @param inputFilePath the file path that needs to be encoded in the zip
+     */
+    fun createZipFile(inputFilePath: String) {
+        val file = File(inputFilePath)
+
+        val compressedStream = this.getDeflateStream(file)
+        this.getLocalFileHeader(file, compressedStream.size)
+        this.zip.appendBytes(compressedStream)
+
+
+        val offset = this.zip.length().toInt()
+        this.getCentralDirectoryFileHeader(file, compressedStream.size)
+        this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
+
+        println("ZIP written to ${this.zipName}")
+    }
 
     /**
      * Write the local file header to the zip archive we are constructing
@@ -48,6 +68,12 @@ class ZIPArchiver(private val zipName: String = "test.zip") {
         // Get tokens
         val lz77 = LZ77Compressor()
         val tokens = lz77.compress(file)
+
+        if (this.debug) {
+            for (token in tokens) {
+                print(token)
+            }
+        }
 
         // Encode
         val huffman = HuffmanCompressor()
