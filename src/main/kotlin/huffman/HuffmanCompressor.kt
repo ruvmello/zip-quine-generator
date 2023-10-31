@@ -34,8 +34,7 @@ class HuffmanCompressor {
         for (index in tokens.indices) {
             print("Huffman: [" + "#".repeat((index * 10).floorDiv(tokens.size)) + " ".repeat(10 - (index * 10).floorDiv(tokens.size)) + "] [2/2]\r")
 
-            val token = tokens[index]
-            when (token) {
+            when (val token = tokens[index]) {
                 is LZ77Literal -> {
                     if (repeats.isNotEmpty()) {
                         outputBytes += encodeRepeatStaticBlock(repeats, false)
@@ -84,7 +83,7 @@ class HuffmanCompressor {
      * @param isLast specifies if the first bit of the block is 1 or 0
      * @return the encoded data in a ByteArray
      */
-    fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
+    private fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)
 
@@ -118,7 +117,7 @@ class HuffmanCompressor {
      * @param isLast specifies if the first bit of the block is 1 or 0
      * @return the encoded data in a ByteArray
      */
-    fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
+    private fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
         val encoded = mutableListOf<UByte>()
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)

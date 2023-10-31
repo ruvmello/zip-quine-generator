@@ -6,7 +6,7 @@ import java.io.File
  * This class handles everything related to the LZ77 encoding part of the deflate algorithm.
  * This is the LZSS version of the LZ77 algorithm where we don't include the next character in a repeat token.
  *
- * @param windowSize is the sliding window in which we search for the longest repeated occurence
+ * @param windowSize is the sliding window in which we search for the longest repeated occurrence
  * @param lookaheadBufferSize is how far we look ahead from the current index
  */
 class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookaheadBufferSize: Int = 258) { // 258 because match is between (3, 258), which can be stored in one byte
@@ -28,7 +28,7 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
         while (currentIndex < inputBytes.size) {
             print("LZ77: [" + "#".repeat((currentIndex * 10).floorDiv(inputBytes.size)) + " ".repeat(10 - (currentIndex * 10).floorDiv(inputBytes.size)) + "] [1/2]\r")
 
-            val (maxMatchLength, maxMatchOffset) = findLongestRepeatedOccurenceInWindow(inputBytes, currentIndex)
+            val (maxMatchLength, maxMatchOffset) = findLongestRepeatedOccurrenceInWindow(inputBytes, currentIndex)
 
             if (maxMatchLength >= minlength) {
                 compressedTokens.add(LZ77Repeat(maxMatchOffset, maxMatchLength))
@@ -51,7 +51,7 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
      * @return a tuple that contains the length of the longest match
      *         and the offset relative to the current position where the match starts
      */
-    fun findLongestRepeatedOccurenceInWindow(inputBytes: ByteArray, currentIndex: Int): Pair<Int, Int> {
+    private fun findLongestRepeatedOccurrenceInWindow(inputBytes: ByteArray, currentIndex: Int): Pair<Int, Int> {
         var maxMatchLength = 0
         var maxMatchOffset = 0
 

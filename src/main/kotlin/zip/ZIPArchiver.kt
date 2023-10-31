@@ -41,7 +41,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      *
      * @param file the file for which we write the local file header
      */
-    fun getLocalFileHeader(file: File, compressedSize: Int) {
+    private fun getLocalFileHeader(file: File, compressedSize: Int) {
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x03, 0x04)
         val zipVersion: ByteArray = byteArrayOf(0x14, 0x00)
@@ -64,7 +64,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param file the file for which we want the deflate stream
      * @return the bytes that need to be written
      */
-    fun getDeflateStream(file: File): ByteArray {
+    private fun getDeflateStream(file: File): ByteArray {
         // Get tokens
         val lz77 = LZ77Compressor()
         val tokens = lz77.compress(file)
@@ -77,8 +77,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
         // Encode
         val huffman = HuffmanCompressor()
-        val output = huffman.encode(tokens)
-        return output
+        return huffman.encode(tokens)
     }
 
     /**
@@ -87,7 +86,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param file the file for which we write the central directory file header
      * @param compressedSize the compressed size
      */
-    fun getCentralDirectoryFileHeader(file: File, compressedSize: Int) {
+    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int) {
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x01, 0x02)   // Other than local file header signature
         val zipVersionMadeBy: ByteArray = byteArrayOf(0x14, 0x00)
@@ -137,7 +136,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param size the size of the central directory
      * @param offset of the start of the central directory on the disk on which the central directory starts
      * */
-    fun getEndOfCentralDirectoryRecord(numberOfFiles: Int, size: Int, offset: Int) {
+    private fun getEndOfCentralDirectoryRecord(numberOfFiles: Int, size: Int, offset: Int) {
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
         zip.appendBytes(zipSignature)
 
