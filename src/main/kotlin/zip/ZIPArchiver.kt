@@ -22,13 +22,22 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param inputFilePath the file path that needs to be encoded in the zip
      */
     fun createZipFile(inputFilePath: String) {
+        // Compress the file
         val file = File(inputFilePath)
 
         val compressedStream = this.getDeflateStream(file)
         this.getLocalFileHeader(file, compressedStream.size)
         this.zip.appendBytes(compressedStream)
 
+        // Quine
+        // TODO: Add local file header of the quine before getting the tokens
+        val quineGenerator = QuineGenerator()
+        val quine = quineGenerator.generateQuineAsListOfTokens(this.zip)
 
+        val huffman = HuffmanCompressor()
+        this.zip.appendBytes(huffman.encode(quine))
+
+        // Zip tail
         val offset = this.zip.length().toInt()
         this.getCentralDirectoryFileHeader(file, compressedStream.size)
         this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
@@ -140,19 +149,19 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
         zip.appendBytes(zipSignature)
 
-        // Disk number, TODO
+        // Disk number
         zip.appendBytes(getByteArrayOf2Bytes(0))
 
-        // Number of disks on which the central directory starts, TODO
+        // Number of disks on which the central directory starts
         zip.appendBytes(getByteArrayOf2Bytes(0))
 
-        // Disk entries, TODO
+        // Disk entries
         zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
 
-        // Total entries, TODO
+        // Total entries
         zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
 
-        // Central Directory size, TODO
+        // Central Directory size
         zip.appendBytes(getByteArrayOf4Bytes(size))
 
         // Offset of the start of the central directory on the disk on which the central directory starts, TODO
@@ -191,10 +200,10 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         dateAsInt = dateAsInt shl 5 xor datetime.dayOfMonth
         zip.appendBytes(getByteArrayOf2Bytes(dateAsInt))
 
-        // CRC32-Checksum, TODO: size bigger than 2GB
+        // CRC32-Checksum
         zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
 
-        // TODO: Compressed size
+        // Compressed size
         zip.appendBytes(getByteArrayOf4Bytes(compressedSize))
 
         // Uncompressed size

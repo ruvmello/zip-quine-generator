@@ -19,7 +19,8 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
      * @return a list of LZ77Token's that encodes the input data
      */
     fun compress(file: File, minlength: Int = 3): List<LZ77Token> {
-        // TODO: Also make it possible to handle files bigger than 2GB
+        // Note: This only supports files with a maximum size of 2GB
+        //       This is not a problem, as our quine has a smaller limitation already
         val inputBytes: ByteArray = file.readBytes()
 
         val compressedTokens: MutableList<LZ77Token> = mutableListOf()
