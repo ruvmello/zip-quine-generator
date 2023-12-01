@@ -83,7 +83,7 @@ class HuffmanCompressor {
      * @param isLast specifies if the first bit of the block is 1 or 0
      * @return the encoded data in a ByteArray
      */
-    private fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
+    fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)
 
@@ -117,7 +117,7 @@ class HuffmanCompressor {
      * @param isLast specifies if the first bit of the block is 1 or 0
      * @return the encoded data in a ByteArray
      */
-    private fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
+    fun encodeRepeatStaticBlock(tokens: List<LZ77Repeat>, isLast: Boolean): ByteArray {
         val encoded = mutableListOf<UByte>()
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)

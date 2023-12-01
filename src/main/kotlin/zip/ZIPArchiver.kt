@@ -2,6 +2,8 @@ package zip
 
 import huffman.HuffmanCompressor
 import lz77.LZ77Compressor
+import lz77.LZ77Literal
+import lz77.LZ77Repeat
 import utils.getByteArrayOf2Bytes
 import utils.getByteArrayOf4Bytes
 import java.io.File
@@ -30,12 +32,9 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         this.zip.appendBytes(compressedStream)
 
         // Quine
-        // TODO: Add local file header of the quine before getting the tokens
-        val quineGenerator = QuineGenerator()
-        val quine = quineGenerator.generateQuineAsListOfTokens(this.zip)
-
-        val huffman = HuffmanCompressor()
-        this.zip.appendBytes(huffman.encode(quine))
+        // TODO: Add local file header of the quine
+        val quine = this.generateQuine(this.zip.readBytes(), byteArrayOf())
+        this.zip.appendBytes(quine)
 
         // Zip tail
         val offset = this.zip.length().toInt()
@@ -43,6 +42,137 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
 
         println("ZIP written to ${this.zipName}")
+    }
+
+    fun generateQuine(zipPrefix: ByteArray, footer: ByteArray): ByteArray {
+        var quineData = byteArrayOf()
+
+        val huffman = HuffmanCompressor()
+
+        // Lp+1
+        val firstLiteral = mutableListOf<LZ77Literal>()
+        zipPrefix.forEach { firstLiteral.add(LZ77Literal(it.toUByte())) }   // [P]
+
+        // Note: Header of a literal block is 5 bytes, so L1 is 5 bytes
+        getLiteralWithSize(firstLiteral.size + 5).forEach { firstLiteral.add(LZ77Literal(it.toUByte())) }   // Lp+1
+
+        // Add to zip
+        var bytesToAdd = huffman.encodeStoredBlock(firstLiteral, false)
+        quineData += bytesToAdd
+
+        // Rp+1
+        val pAnd1 = firstLiteral.size
+        var repeats = mutableListOf<LZ77Repeat>()
+        for (i in 1..(pAnd1 / 258)) {
+            repeats.add(LZ77Repeat(pAnd1, 258))
+        }
+        repeats.add(LZ77Repeat(pAnd1, pAnd1 % 258))
+
+        // Add to zip
+        bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
+        quineData += bytesToAdd
+
+        // Do it once and if we can't fit the last repeat in under one unit, keep repeating until we can
+        do {
+            // Keep track of the encoding for the literal
+            var lXAndThree = byteArrayOf()
+
+            // Lx
+            val rPAndOne = mutableListOf<LZ77Literal>()
+            bytesToAdd.forEach { rPAndOne.add(LZ77Literal(it.toUByte())) }
+
+            // Add to zip
+            bytesToAdd = huffman.encodeStoredBlock(rPAndOne, false)
+            lXAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
+            quineData += bytesToAdd
+
+            // L1
+            val lX = bytesToAdd.copyOfRange(0, 5)
+            var literals = mutableListOf<LZ77Literal>()
+            lX.forEach { literals.add(LZ77Literal(it.toUByte())) }
+
+            // Add to zip
+            bytesToAdd = huffman.encodeStoredBlock(literals, false)
+            lXAndThree += bytesToAdd
+            quineData += bytesToAdd
+
+            // Lx+3
+            lXAndThree += getLiteralWithSize(lXAndThree.size + 5)
+            literals = mutableListOf()
+            lXAndThree.forEach { literals.add(LZ77Literal(it.toUByte())) }
+
+            // Add to zip
+            bytesToAdd = huffman.encodeStoredBlock(literals, false)
+            quineData += bytesToAdd
+
+            // Rx+3
+            val x = bytesToAdd.copyOfRange(5, bytesToAdd.size)  // Header of L is 5 bytes
+            repeats = mutableListOf()
+            for (i in 1..(x.size / 258)) {
+                repeats.add(LZ77Repeat(x.size, 258))
+            }
+            repeats.add(LZ77Repeat(x.size, pAnd1 % 258))
+
+            // Add to zip
+            bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
+            quineData += bytesToAdd
+        } while (bytesToAdd.size > 5)
+
+        // L4
+        // Encoding of R4 is constant
+        val bytesR4 = byteArrayOf(0x42, 0x88.toByte(), 0x21, 0xc4.toByte(), 0x00)
+        var literal = mutableListOf<LZ77Literal>()
+        bytesR4.forEach { literal.add(LZ77Literal(it.toUByte())) }
+        getLiteralWithSize(20).forEach { literal.add(LZ77Literal(it.toUByte())) }
+        bytesR4.forEach { literal.add(LZ77Literal(it.toUByte())) }
+        getLiteralWithSize(20).forEach { literal.add(LZ77Literal(it.toUByte())) }
+
+        // Add to zip
+        bytesToAdd = huffman.encodeStoredBlock(literal, false)
+        quineData += bytesToAdd
+
+        // R4
+        quineData += bytesR4
+
+        // L4
+        literal = mutableListOf()
+        bytesR4.forEach { literal.add(LZ77Literal(it.toUByte())) }
+        getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
+        getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
+        // TODO: fix y to be the size of Rs+y
+        val y = 0
+        getLiteralWithSize(footer.size + y).forEach { literal.add(LZ77Literal(it.toUByte())) }
+
+        // Add to zip
+        bytesToAdd = huffman.encodeStoredBlock(literal, true)
+        quineData += bytesToAdd
+
+        // R4
+        quineData += bytesR4
+
+        // L0
+        quineData += getLiteralWithSize(0)
+
+        // L0
+        quineData += getLiteralWithSize(0)
+
+        // TODO fix everything underneath
+//        val bytesR4End = byteArrayOf(0xc2.toByte(), 0x88.toByte(), 0x21, 0xc4.toByte(), 0x00)
+//        // Ls+y
+//        quineData += getLiteralWithSize(y + footer.size) + bytesR4End
+//        for (i in 0..14) {
+//            quineData += byteArrayOf(0x00)
+//        }
+//
+//        // Rs+y
+//        quineData += bytesR4End
+
+        return quineData
+    }
+
+    fun getLiteralWithSize(size: Int): ByteArray {
+        return byteArrayOf(0.toByte()) + getByteArrayOf2Bytes(size) +
+                getByteArrayOf2Bytes(size.inv())
     }
 
     /**
