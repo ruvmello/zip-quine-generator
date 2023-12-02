@@ -36,22 +36,34 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
         // ### Quine ###
         val backup = this.zip.readBytes()
+
         // Generate quine of the right size, but the local file header will still be wrong
-        var footer = byteArrayOf()
+        // Create right size header
         this.getLocalFileHeader(this.zip, 0)
+
+        // Create right size footer
+        var offset = this.zip.length().toInt()
+        var cd = this.getCentralDirectoryFileHeader(file, compressedStream.size, 0)
+        var cd_quine = this.getCentralDirectoryFileHeader(this.zip, 0, offset)
+        var endCd = this.getEndOfCentralDirectoryRecord(2, this.zip.length().toInt() - offset, offset)
+        var footer = cd + cd_quine + endCd
+
         val quine = this.generateQuine(this.zip.readBytes(), footer)
 
         // Now that we know the compressed size, make quine with the right local file header
         this.zip.writeBytes(backup)
+        offset = this.zip.length().toInt()
         this.getLocalFileHeader(this.zip, quine.size)
         val quine2 = this.generateQuine(this.zip.readBytes(), footer)
         this.zip.appendBytes(quine2)
 
         // Zip tail
-        val offset = this.zip.length().toInt()
-        val cd = this.getCentralDirectoryFileHeader(file, compressedStream.size)
+        cd = this.getCentralDirectoryFileHeader(file, compressedStream.size, 0)
+        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, offset)
+        offset = this.zip.length().toInt()
+        endCd = this.getEndOfCentralDirectoryRecord(2, this.zip.length().toInt() - offset, offset)
         this.zip.appendBytes(cd)
-        val endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
+        this.zip.appendBytes(cd_quine)
         this.zip.appendBytes(endCd)
 
         println("ZIP written to ${this.zipName}")
@@ -265,7 +277,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param file the file for which we write the central directory file header
      * @param compressedSize the compressed size
      */
-    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int): ByteArray {
+    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int, localHeaderOffset: Int): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -296,8 +308,8 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         val externalAttributes = byteArrayOf(0x02, 0x00, 0x00, 0x00)    // Lower byte -> zip spec version, TODO: is the other mapping needed?
         data += externalAttributes
 
-        // Offset local header, TODO: is this needed? (windows just sets 0 when compressing)
-        data += getByteArrayOf4Bytes(0)
+        // Offset local header
+        data += getByteArrayOf4Bytes(localHeaderOffset)
 
         // File name
         data += file.name.encodeToByteArray()
