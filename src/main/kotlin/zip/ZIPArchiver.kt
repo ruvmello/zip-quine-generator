@@ -234,7 +234,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         zip.appendBytes(file.name.encodeToByteArray())
 
         // Extra field content
-        // zip.appendBytes(getByteArrayOf2Bytes(0))
+        
     }
 
     /**
@@ -273,9 +273,6 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         val zipVersionMadeBy: ByteArray = byteArrayOf(0x14, 0x00)
         val zipVersionNeededToExtract: ByteArray = byteArrayOf(0x14, 0x00)
 
-//        zip.appendBytes(zipSignature)
-//        zip.appendBytes(zipVersionMadeBy)
-//        zip.appendBytes(zipVersionNeededToExtract)
         data += zipSignature
         data += zipVersionMadeBy
         data += zipVersionNeededToExtract
@@ -286,29 +283,23 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         val comment = ""
 
         // File comment length
-//        zip.appendBytes(getByteArrayOf2Bytes(comment.length))
         data += getByteArrayOf2Bytes(comment.length)
 
         // Number of disk
-//        zip.appendBytes(getByteArrayOf2Bytes(0))
         data += getByteArrayOf2Bytes(0)
 
         // Internal attributes, https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val internalAttributes = byteArrayOf(0x01, 0x00)    // First bit set -> text file, TODO: Extend for other files
-//        zip.appendBytes(internalAttributes)
         data += internalAttributes
 
         // External attributes
         val externalAttributes = byteArrayOf(0x02, 0x00, 0x00, 0x00)    // Lower byte -> zip spec version, TODO: is the other mapping needed?
-//        zip.appendBytes(externalAttributes)
         data += externalAttributes
 
         // Offset local header, TODO: is this needed? (windows just sets 0 when compressing)
-//        zip.appendBytes(getByteArrayOf4Bytes(0))
         data += getByteArrayOf4Bytes(0)
 
         // File name
-//        zip.appendBytes(file.name.encodeToByteArray())
         data += file.name.encodeToByteArray()
 
         // Extra field content
@@ -317,7 +308,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         // File comment
         if (comment.isNotEmpty())
             data += comment.encodeToByteArray()
-//            zip.appendBytes(comment.encodeToByteArray())
+
         return data
     }
 
@@ -333,40 +324,31 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         var data = byteArrayOf()
 
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
-//        zip.appendBytes(zipSignature)
         data += zipSignature
 
         // Disk number
-//        zip.appendBytes(getByteArrayOf2Bytes(0))
         data += getByteArrayOf2Bytes(0)
 
         // Number of disks on which the central directory starts
-//        zip.appendBytes(getByteArrayOf2Bytes(0))
         data += getByteArrayOf2Bytes(0)
 
         // Disk entries
-//        zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
         data += getByteArrayOf2Bytes(numberOfFiles)
 
         // Total entries
-//        zip.appendBytes(getByteArrayOf2Bytes(numberOfFiles))
         data += getByteArrayOf2Bytes(numberOfFiles)
 
         // Central Directory size
-//        zip.appendBytes(getByteArrayOf4Bytes(size))
         data += getByteArrayOf4Bytes(size)
 
         // Offset of the start of the central directory on the disk on which the central directory starts, TODO
-//        zip.appendBytes(getByteArrayOf4Bytes(offset))
         data += getByteArrayOf4Bytes(offset)
 
         val comment = ""
         // Comment length
-//        zip.appendBytes(getByteArrayOf2Bytes(comment.length))
         data += getByteArrayOf2Bytes(comment.length)
 
         // Comment
-//        zip.appendBytes(comment.encodeToByteArray())
         data += comment.encodeToByteArray()
         return data
     }
@@ -383,8 +365,6 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
         val zipCompressionMethod: ByteArray = byteArrayOf(0x08, 0x00)
 
-//        zip.appendBytes(zipFlags)
-//        zip.appendBytes(zipCompressionMethod)
         data += zipFlags
         data += zipCompressionMethod
 
@@ -392,34 +372,27 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         var timeAsInt: Int = datetime.hour
         timeAsInt = timeAsInt shl 6 xor datetime.minute
         timeAsInt = timeAsInt shl 5 xor (datetime.second / 2)
-//        zip.appendBytes(getByteArrayOf2Bytes(timeAsInt))
         data += getByteArrayOf2Bytes(timeAsInt)
 
         // File modification date
         var dateAsInt: Int = datetime.year - 1980
         dateAsInt = dateAsInt shl 4 xor datetime.monthValue
         dateAsInt = dateAsInt shl 5 xor datetime.dayOfMonth
-//        zip.appendBytes(getByteArrayOf2Bytes(dateAsInt))
         data += getByteArrayOf2Bytes(dateAsInt)
 
         // CRC32-Checksum
-//        zip.appendBytes(getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
         data += getByteArrayOf4Bytes(calculateCRC32(file.readBytes()))
 
         // Compressed size
-//        zip.appendBytes(getByteArrayOf4Bytes(compressedSize))
         data += getByteArrayOf4Bytes(compressedSize)
 
         // Uncompressed size
-//        zip.appendBytes(getByteArrayOf4Bytes(file.length().toInt()))
         data += getByteArrayOf4Bytes(file.length().toInt())
 
         // File name length
-//        zip.appendBytes(getByteArrayOf2Bytes(file.name.length))
         data += getByteArrayOf2Bytes(file.name.length)
 
         // Extra field length
-//        zip.appendBytes(getByteArrayOf2Bytes(0))
         data += getByteArrayOf2Bytes(0)
 
         return data
