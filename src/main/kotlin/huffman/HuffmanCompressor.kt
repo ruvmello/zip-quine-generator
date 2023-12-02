@@ -83,7 +83,7 @@ class HuffmanCompressor {
      * @param isLast specifies if the first bit of the block is 1 or 0
      * @return the encoded data in a ByteArray
      */
-    fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean): ByteArray {
+    fun encodeStoredBlock(literal: List<LZ77Literal>, isLast: Boolean, zeroLiteral: Boolean = false): ByteArray {
         // First bit
         byte = byte shl 1 xor (if (isLast) 1u else 0u)
 
@@ -103,8 +103,8 @@ class HuffmanCompressor {
         byte = 0u
         totalBitsSet = 0
 
-        return outputBytes + getByteArrayOf2Bytes(len) +
-                getByteArrayOf2Bytes(len.inv()) + literal.map { it.char.toByte() }.toByteArray()
+        return if(!zeroLiteral) outputBytes + getByteArrayOf2Bytes(len) + getByteArrayOf2Bytes(len.inv()) + literal.map { it.char.toByte() }.toByteArray()
+        else outputBytes + getByteArrayOf2Bytes(len) + getByteArrayOf2Bytes(len.inv())
     }
 
     /**
