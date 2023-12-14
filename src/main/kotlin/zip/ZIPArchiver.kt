@@ -50,6 +50,8 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         var footer = cd_quine + endCd
 
         var quine = this.generateQuine(this.zip.readBytes(), footer)
+        this.zip.appendBytes(quine)
+        offset = this.zip.length().toInt()
 
         // Now that we know the compressed size, make quine with the right local file header
         this.zip.writeBytes(backup)
@@ -58,15 +60,15 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         lh_quine = this.getLocalFileHeader(this.zip, quine.size, totalSize)
         this.zip.appendBytes(lh_quine)
 
+        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, 0, totalSize)
+        endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() + quine.size + cd_quine.size - offset, offset)
+        footer = cd_quine + endCd
+
         quine = this.generateQuine(this.zip.readBytes(), footer)
         this.zip.appendBytes(quine)
 
         // Zip tail
-        offset = this.zip.length().toInt()
-        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, 0, totalSize)
-        this.zip.appendBytes(cd_quine)
-        endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
-        this.zip.appendBytes(endCd)
+        this.zip.appendBytes(footer)
 
         println("ZIP written to ${this.zipName}")
     }
