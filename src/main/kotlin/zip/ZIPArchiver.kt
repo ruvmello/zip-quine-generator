@@ -27,43 +27,45 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         // Clear zip file
         this.zip.writeBytes(byteArrayOf())
 
-        // Compress the file
-        val file = File(inputFilePath)
-
-        val compressedStream = this.getDeflateStream(file)
-        this.getLocalFileHeader(file, compressedStream.size)
-        this.zip.appendBytes(compressedStream)
+//        // Compress the file
+//        val file = File(inputFilePath)
+//
+//        val compressedStream = this.getDeflateStream(file)
+//        val lh = this.getLocalFileHeader(file, compressedStream.size, file.length().toInt())
+//        this.zip.appendBytes(lh)
+//        this.zip.appendBytes(compressedStream)
 
         // ### Quine ###
         val backup = this.zip.readBytes()
 
         // Generate quine of the right size, but the local file header will still be wrong
         // Create right size header
-        this.getLocalFileHeader(this.zip, 0)
+        var offset = this.zip.length().toInt()
+        var lh_quine = this.getLocalFileHeader(this.zip, 0, 0)
+        this.zip.appendBytes(lh_quine)
 
         // Create right size footer
-        var offset = this.zip.length().toInt()
-        var cd = this.getCentralDirectoryFileHeader(file, compressedStream.size, 0)
-        var cd_quine = this.getCentralDirectoryFileHeader(this.zip, 0, offset)
-        var endCd = this.getEndOfCentralDirectoryRecord(2, this.zip.length().toInt() - offset, offset)
-        var footer = cd + cd_quine + endCd
+        var cd_quine = this.getCentralDirectoryFileHeader(this.zip, 0, 0, 0)
+        var endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
+        var footer = cd_quine + endCd
 
-        val quine = this.generateQuine(this.zip.readBytes(), footer)
+        var quine = this.generateQuine(this.zip.readBytes(), footer)
 
         // Now that we know the compressed size, make quine with the right local file header
         this.zip.writeBytes(backup)
-        offset = this.zip.length().toInt()
-        this.getLocalFileHeader(this.zip, quine.size)
-        val quine2 = this.generateQuine(this.zip.readBytes(), footer)
-        this.zip.appendBytes(quine2)
+        val totalSize = lh_quine.size + quine.size + footer.size
+
+        lh_quine = this.getLocalFileHeader(this.zip, quine.size, totalSize)
+        this.zip.appendBytes(lh_quine)
+
+        quine = this.generateQuine(this.zip.readBytes(), footer)
+        this.zip.appendBytes(quine)
 
         // Zip tail
-        cd = this.getCentralDirectoryFileHeader(file, compressedStream.size, 0)
-        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, offset)
         offset = this.zip.length().toInt()
-        endCd = this.getEndOfCentralDirectoryRecord(2, this.zip.length().toInt() - offset, offset)
-        this.zip.appendBytes(cd)
+        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, 0, totalSize)
         this.zip.appendBytes(cd_quine)
+        endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
         this.zip.appendBytes(endCd)
 
         println("ZIP written to ${this.zipName}")
@@ -136,12 +138,13 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
             for (i in 1..(x.size / 258)) {
                 repeats.add(LZ77Repeat(x.size, 258))
             }
-            repeats.add(LZ77Repeat(x.size, pAnd1 % 258))
+            repeats.add(LZ77Repeat(x.size, x.size % 258))
 
             // Add to zip
             bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
             quineData += bytesToAdd
         } while (bytesToAdd.size > 5)
+        // TODO make it so that if it is smaller than 5 bytes, it is exactly five bytes
 
         // L4
         // Encoding of R4 is constant
@@ -168,7 +171,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         getLiteralWithSize(repeatAndTwoL0.size + footer.size).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Add to zip
-        bytesToAdd = huffman.encodeStoredBlock(literal, true)
+        bytesToAdd = huffman.encodeStoredBlock(literal, false)
         quineData += bytesToAdd
 
         // R4
@@ -214,9 +217,6 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         bytesToAdd += huffman.encodeStoredBlock(listOf(), isLast = false, zeroLiteral = true)
         bytesToAdd += huffman.encodeStoredBlock(listOf(), isLast = true, zeroLiteral = true)
 
-        val test = File("test.txt")
-        test.writeBytes(bytesToAdd)
-
         return bytesToAdd
     }
 
@@ -231,22 +231,25 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      *
      * @param file the file for which we write the local file header
      */
-    private fun getLocalFileHeader(file: File, compressedSize: Int) {
+    private fun getLocalFileHeader(file: File, compressedSize: Int, uncompressedSize: Int): ByteArray {
+        var data = byteArrayOf()
+
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
         val zipSignature: ByteArray = byteArrayOf(0x50, 0x4b, 0x03, 0x04)
         val zipVersion: ByteArray = byteArrayOf(0x14, 0x00)
 
-        zip.appendBytes(zipSignature)
-        zip.appendBytes(zipVersion)
+        data += zipSignature
+        data += zipVersion
 
-        val commonHeader = this.writeCommonHeader(file, compressedSize)
-        zip.appendBytes(commonHeader)
+        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize)
+        data += commonHeader
 
         // File name
-        zip.appendBytes(file.name.encodeToByteArray())
+        data += file.name.encodeToByteArray()
 
         // Extra field content
-        
+
+        return data
     }
 
     /**
@@ -277,7 +280,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param file the file for which we write the central directory file header
      * @param compressedSize the compressed size
      */
-    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int, localHeaderOffset: Int): ByteArray {
+    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -289,7 +292,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         data += zipVersionMadeBy
         data += zipVersionNeededToExtract
 
-        val commonHeader = this.writeCommonHeader(file, compressedSize)
+        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize)
         data += commonHeader
 
         val comment = ""
@@ -353,7 +356,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         // Central Directory size
         data += getByteArrayOf4Bytes(size)
 
-        // Offset of the start of the central directory on the disk on which the central directory starts, TODO
+        // Offset of the start of the central directory on the disk on which the central directory starts
         data += getByteArrayOf4Bytes(offset)
 
         val comment = ""
@@ -371,7 +374,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      *
      * @param file the file for which we have to write the header
      * */
-    private fun writeCommonHeader(file: File, compressedSize: Int): ByteArray {
+    private fun writeCommonHeader(file: File, compressedSize: Int, uncompressedSize: Int): ByteArray {
         var data = byteArrayOf()
 
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
@@ -399,7 +402,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         data += getByteArrayOf4Bytes(compressedSize)
 
         // Uncompressed size
-        data += getByteArrayOf4Bytes(file.length().toInt())
+        data += getByteArrayOf4Bytes(uncompressedSize)
 
         // File name length
         data += getByteArrayOf2Bytes(file.name.length)
