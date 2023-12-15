@@ -13,7 +13,7 @@ fun getByteArrayOf2Bytes(input: Int): ByteArray {
 /**
  * An integer has a size of 32 bits, get a UByteArray of the size four with the least significant byte first
  *
- * @param input the integer for which we construct a UByteArray of size four
+ * @param input the integer for which we construct a ByteArray of size four
  * @return the bytearray of size four
  */
 fun getByteArrayOf4Bytes(input: Int): ByteArray {

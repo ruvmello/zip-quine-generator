@@ -32,7 +32,6 @@ class HuffmanCompressor {
         val literals = mutableListOf<LZ77Literal>()
         val repeats = mutableListOf<LZ77Repeat>()
         for (index in tokens.indices) {
-            print("Huffman: [" + "#".repeat((index * 10).floorDiv(tokens.size)) + " ".repeat(10 - (index * 10).floorDiv(tokens.size)) + "] [2/2]\r")
 
             when (val token = tokens[index]) {
                 is LZ77Literal -> {
@@ -65,8 +64,6 @@ class HuffmanCompressor {
             totalBitsSet += (8 - totalBitsSet)
             outputBytes += getBytesAndReset().map { it.toByte() }.toByteArray()
         }
-
-        print("Huffman: [##########] [2/2]\n")
 
         return outputBytes
     }

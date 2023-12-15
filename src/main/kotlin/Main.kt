@@ -6,6 +6,7 @@ fun main(args: Array<String>) {
     var inputFilePath: String? = null
     var outputFilePath: String? = null
     var debug = false
+    var noCrc = false
     while(arguments.isNotEmpty()) {
         val option = arguments.removeAt(0)
         when(option) {
@@ -17,19 +18,20 @@ fun main(args: Array<String>) {
             }
             "--output", "-o" -> outputFilePath = arguments.removeAt(0)
             "--debug" -> debug = true
+            "--no-crc" -> noCrc = true
             else -> inputFilePath = option
         }
     }
 
     if (inputFilePath == null) {
         println("There is no file given as input.")
-        println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug]")
+        println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug] [--no-crc]")
         exitProcess(0)
     }
 
     if (outputFilePath == null)
         outputFilePath = inputFilePath.substringBeforeLast('.') + ".zip"
 
-    val archiver = ZIPArchiver(outputFilePath, debug)
+    val archiver = ZIPArchiver(outputFilePath, debug, noCrc)
     archiver.createZipFile(inputFilePath)
 }

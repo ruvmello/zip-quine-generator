@@ -14,7 +14,7 @@ import java.time.LocalDateTime
  *
  * @param zipName the file name to which we write the bytes
  */
-class ZIPArchiver(private val zipName: String = "test.zip", private val debug: Boolean = false) {
+class ZIPArchiver(private val zipName: String = "test.zip", private val debug: Boolean = false, private val noCrc: Boolean = false) {
     private val zip = File(this.zipName)
     private val datetime = LocalDateTime.now()
 
@@ -53,22 +53,33 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         this.zip.appendBytes(quine)
         offset = this.zip.length().toInt()
 
-        // Now that we know the compressed size, make quine with the right local file header
-        this.zip.writeBytes(backup)
-        val totalSize = lh_quine.size + quine.size + footer.size
+        // Now that we know the compressed size, make quine with the right local file header and calculate right crc
+        val range = if (this.noCrc) 0..0 else Int.MIN_VALUE..Int.MAX_VALUE
+        for (crc in range) {
+            println("${crc}")
+            this.zip.writeBytes(backup)
+            val totalSize = lh_quine.size + quine.size + footer.size
 
-        lh_quine = this.getLocalFileHeader(this.zip, quine.size, totalSize)
-        this.zip.appendBytes(lh_quine)
+            lh_quine = this.getLocalFileHeader(this.zip, quine.size, totalSize, getByteArrayOf4Bytes(crc))
+            this.zip.appendBytes(lh_quine)
 
-        cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, 0, totalSize)
-        endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() + quine.size + cd_quine.size - offset, offset)
-        footer = cd_quine + endCd
+            cd_quine = this.getCentralDirectoryFileHeader(this.zip, quine.size, 0, totalSize, getByteArrayOf4Bytes(crc))
+            endCd = this.getEndOfCentralDirectoryRecord(
+                1,
+                this.zip.length().toInt() + quine.size + cd_quine.size - offset,
+                offset
+            )
+            footer = cd_quine + endCd
 
-        quine = this.generateQuine(this.zip.readBytes(), footer)
-        this.zip.appendBytes(quine)
+            quine = this.generateQuine(this.zip.readBytes(), footer)
+            this.zip.appendBytes(quine)
 
-        // Zip tail
-        this.zip.appendBytes(footer)
+            // Zip tail
+            this.zip.appendBytes(footer)
+
+            if (calculateCRC32(this.zip.readBytes()) == crc)
+                break
+        }
 
         println("ZIP written to ${this.zipName}")
     }
@@ -291,7 +302,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      *
      * @param file the file for which we write the local file header
      */
-    private fun getLocalFileHeader(file: File, compressedSize: Int, uncompressedSize: Int): ByteArray {
+    private fun getLocalFileHeader(file: File, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf()): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -301,7 +312,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         data += zipSignature
         data += zipVersion
 
-        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize)
+        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize, crc32)
         data += commonHeader
 
         // File name
@@ -340,7 +351,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      * @param file the file for which we write the central directory file header
      * @param compressedSize the compressed size
      */
-    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int): ByteArray {
+    private fun getCentralDirectoryFileHeader(file: File, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf()): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -352,7 +363,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         data += zipVersionMadeBy
         data += zipVersionNeededToExtract
 
-        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize)
+        val commonHeader = this.writeCommonHeader(file, compressedSize, uncompressedSize, crc32)
         data += commonHeader
 
         val comment = ""
@@ -434,7 +445,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
      *
      * @param file the file for which we have to write the header
      * */
-    private fun writeCommonHeader(file: File, compressedSize: Int, uncompressedSize: Int): ByteArray {
+    private fun writeCommonHeader(file: File, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray): ByteArray {
         var data = byteArrayOf()
 
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
@@ -456,7 +467,12 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         data += getByteArrayOf2Bytes(dateAsInt)
 
         // CRC32-Checksum
-        data += getByteArrayOf4Bytes(calculateCRC32(file.readBytes()))
+        data += if (crc32.isEmpty()) {
+            getByteArrayOf4Bytes(calculateCRC32(file.readBytes()))
+        } else {
+            assert(crc32.size == 4) { "CRC-32 is not 4 bytes." }
+            crc32
+        }
 
         // Compressed size
         data += getByteArrayOf4Bytes(compressedSize)
