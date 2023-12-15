@@ -207,7 +207,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
         for (i in 3 until length) {
             val repeat1 = LZ77Repeat(distance, i)
-            val repeat2 = LZ77Repeat(distance, length - 1)
+            val repeat2 = LZ77Repeat(distance, length - i)
             val repeats = listOf(repeat1, repeat2)
             val bytes = huffman.encodeRepeatStaticBlock(repeats, false)
             if (bytes.size == 5) {
