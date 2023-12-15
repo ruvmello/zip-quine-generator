@@ -144,8 +144,14 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
             // Add to zip
             bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
+
+            if (repeats.size == 1 && bytesToAdd.size != 5) {
+                val repeat: LZ77Repeat = repeats.get(0)
+                bytesToAdd = getFiveByteRepeat(repeat)
+            }
+
             quineData += bytesToAdd
-        } while (bytesToAdd.size > 5)
+        } while (bytesToAdd.size < 4)
         // TODO make it so that if it is smaller than 5 bytes, it is exactly five bytes
 
         // L4
@@ -192,6 +198,24 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         quineData += repeatAndTwoL0
 
         return quineData
+    }
+
+    fun getFiveByteRepeat(token: LZ77Repeat): ByteArray {
+        val huffman = HuffmanCompressor()
+        val length = token.length
+        val distance = token.distance
+
+        for (i in 3 until length) {
+            val repeat1 = LZ77Repeat(distance, i)
+            val repeat2 = LZ77Repeat(distance, length - 1)
+            val repeats = listOf(repeat1, repeat2)
+            val bytes = huffman.encodeRepeatStaticBlock(repeats, false)
+            if (bytes.size == 5) {
+                return bytes
+            }
+        }
+
+        return byteArrayOf()
     }
 
     fun calculateLastQuineRepeat(footerSize: Int): ByteArray {
