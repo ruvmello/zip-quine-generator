@@ -152,17 +152,16 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
             quineData += bytesToAdd
         } while (bytesToAdd.size < 4)
-        // TODO make it so that if it is smaller than 5 bytes, it is exactly five bytes
         // Keep track of the encoding for the literal
-        var lXAndThree = byteArrayOf()
+        var lZAndThree = byteArrayOf()
 
-        // Lx
-        val rPAndOne = mutableListOf<LZ77Literal>()
-        bytesToAdd.forEach { rPAndOne.add(LZ77Literal(it.toUByte())) }
+        // Lz
+        val rXAndThree = mutableListOf<LZ77Literal>()
+        bytesToAdd.forEach { rXAndThree.add(LZ77Literal(it.toUByte())) }
 
         // Add to zip
-        bytesToAdd = huffman.encodeStoredBlock(rPAndOne, false)
-        lXAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
+        bytesToAdd = huffman.encodeStoredBlock(rXAndThree, false)
+        lZAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
         quineData += bytesToAdd
 
         // L1
@@ -172,19 +171,19 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
-        lXAndThree += bytesToAdd
+        lZAndThree += bytesToAdd
         quineData += bytesToAdd
 
-        // Lx+3
-        lXAndThree += getLiteralWithSize(lXAndThree.size + 5)
+        // Lz+3
+        lZAndThree += getLiteralWithSize(lZAndThree.size + 5)
         literals = mutableListOf()
-        lXAndThree.forEach { literals.add(LZ77Literal(it.toUByte())) }
+        lZAndThree.forEach { literals.add(LZ77Literal(it.toUByte())) }
 
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
         quineData += bytesToAdd
 
-        // Rx+3
+        // Rz+3
         val bytesR4 = byteArrayOf(0x42, 0x88.toByte(), 0x21, 0xc4.toByte(), 0x00)
         bytesToAdd = bytesR4
 
