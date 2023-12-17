@@ -35,7 +35,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         print("Compressing the given file...\r")
         val compressedStream = this.getDeflateStream(file)
         val lh = this.getLocalFileHeader(file.name, compressedStream.size, file.length().toInt(), getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes())))
-        val cd = this.getCentralDirectoryFileHeader(file.name, compressedStream.size, 0, file.length().toInt())
+        val cd = this.getCentralDirectoryFileHeader(file.name, compressedStream.size, 0, file.length().toInt(), getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes())))
         this.zip.appendBytes(lh)
         this.zip.appendBytes(compressedStream)
 
@@ -64,10 +64,10 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         var fullZipFile = backup.copyOf()
         val totalSize = lh_quine.size + quine.size + footer.size
 
-        lh_quine = this.getLocalFileHeader(this.zipName, quine.size, totalSize, getByteArrayOf4Bytes(0))
+        lh_quine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
         fullZipFile += lh_quine
 
-        cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize, getByteArrayOf4Bytes(0))
+        cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
             2,
             fullZipFile.size + quine.size + cd.size + cd_quine.size - offset,
