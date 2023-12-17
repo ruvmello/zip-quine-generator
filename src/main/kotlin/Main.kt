@@ -13,7 +13,7 @@ fun main(args: Array<String>) {
             "--help", "-h" -> {
                 println("This program aims to create a zip quine.")
                 println("The created zip contains the input file, as well as the zip itself.")
-                println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug]")
+                println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug] [--no-crc]")
                 exitProcess(0)
             }
             "--output", "-o" -> outputFilePath = arguments.removeAt(0)

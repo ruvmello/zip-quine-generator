@@ -1,5 +1,27 @@
 package utils
 
+fun findLastSublistOfByteArray(list: ByteArray, sublist: ByteArray): Int {
+    var index = 0
+    while (index < list.size) {
+        if (list[index] == sublist[0]) {
+            var isSublist = true
+            for (i in 1 until sublist.size) {
+                if (list[index + i] != sublist[i]) {
+                    isSublist = false
+                    index += i
+                    break
+                }
+            }
+            if (isSublist) {
+                return index
+            }
+        } else {
+            index++
+        }
+    }
+    return -1
+}
+
 /**
  * An integer has a size of 32 bits, get a UByteArray of the two least significant bytes
  *
