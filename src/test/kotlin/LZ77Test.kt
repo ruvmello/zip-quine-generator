@@ -1,6 +1,8 @@
 import lz77.LZ77Compressor
 import lz77.LZ77Repeat
 import org.testng.annotations.Test
+import utils.getByteArrayOf4Bytes
+import zip.CRC32Bruteforcer
 import java.io.File
 
 class LZ77Test {
@@ -45,6 +47,34 @@ class LZ77Test {
                 assert((compressedTokens[i] as LZ77Repeat).length == right_lengths[index])
                 index++
             }
+        }
+    }
+
+    @Test
+    fun test() {
+        val file = File("d.zip")
+        val crc = CRC32Bruteforcer()
+        val value = getByteArrayOf4Bytes(crc.calculateCRC32(file.readBytes()))
+        for (b in value) {
+            val st = String.format("%02X", b)
+            print(st)
+        }
+    }
+
+    @Test
+    fun test2(){
+        val file = File("d.zip").readBytes()
+        val part1 = file.copyOfRange(0, file.size / 2)
+        val part2 = file.copyOfRange(file.size / 2, file.size)
+        val crc = CRC32Bruteforcer()
+        for (b in getByteArrayOf4Bytes(crc.calculateCRC32(file))) {
+            val st = String.format("%02X", b)
+            print(st)
+        }
+        println()
+        for (b in getByteArrayOf4Bytes(crc.calculateCRC32(part2, crc.calculateCRC32Loop(part1)))) {
+            val st = String.format("%02X", b)
+            print(st)
         }
     }
 }

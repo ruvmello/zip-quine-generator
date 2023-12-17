@@ -13,25 +13,25 @@ class CRC32Bruteforcer {
         this.calculateTable()
     }
 
-    fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int): ByteArray {
+    fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): ByteArray {
         val range = Int.MIN_VALUE..Int.MAX_VALUE
         val numThreads = Runtime.getRuntime().availableProcessors() // Adjust as needed
         val segmentSize: Int = ((range.last.toLong() - range.first.toLong() + 1) / numThreads).toInt()
 
         val firstPartLh = fullZipFile.copyOfRange(0, backupSize + 14)
-        val secondPartLh = fullZipFile.copyOfRange(backupSize + 18, backupSize + lhQuineSize + 5 + 14)
+        val secondPartLh = fullZipFile.copyOfRange(backupSize + 18, backupSize + lhQuineSize + 5 + backupSize + 14)
 
         val indexOfFooterInQuine = findLastSublistOfByteArray(quine, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
-        val firstPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + 5 + 18, backupSize + lhQuineSize + indexOfFooterInQuine + 16)
-        val secondPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + indexOfFooterInQuine + 20, backupSize + lhQuineSize + quine.size + 16)
-        val lastPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + quine.size + 20, fullZipFile.size)
-        val prevCalculatedCrc = calculateCRC32(firstPartLh)
+        val firstPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + 5 + backupSize + 18, backupSize + lhQuineSize + indexOfFooterInQuine + 16)
+        val secondPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + indexOfFooterInQuine + 20, backupSize + lhQuineSize + quine.size + cdSize + 16)
+        val lastPartCd = fullZipFile.copyOfRange(backupSize + lhQuineSize + quine.size + cdSize + 20, fullZipFile.size)
+        val prevCalculatedCrc = calculateCRC32Loop(firstPartLh)
 
         val resultFound = AtomicBoolean(false)
         val result = AtomicReference<ByteArray>()
 
         val latch = CountDownLatch(numThreads)
-
+        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (this might take a while)\r")
         for (i in 0 until numThreads) {
             val start = range.first + i * segmentSize
             val end = if (i == numThreads - 1) range.last else start + segmentSize - 1
@@ -44,6 +44,7 @@ class CRC32Bruteforcer {
 
                     val byteFormOfCrc = getByteArrayOf4Bytes(crc)
                     var currentCrcFile = byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
+//                    val currentCrcFile = firstPartLh + byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
 
                     if (calculateCRC32(currentCrcFile, prevCalculatedCrc) == crc) {
                         currentCrcFile = firstPartLh + currentCrcFile
@@ -64,6 +65,8 @@ class CRC32Bruteforcer {
         } catch (e: InterruptedException) {
             e.printStackTrace()
         }
+
+        println("Starting bruteforcing the CRC32... Done")
 
         return if (resultFound.get()) {
             result.get()
@@ -101,24 +104,36 @@ class CRC32Bruteforcer {
     fun calculateCRC32(byteArray: ByteArray): Int {
         // Reference implementation that I ported to kotlin
         // https://www.rosettacode.org/wiki/CRC-32#C
-        var crc32 = 0xFFFFFFFF.toInt()
-        for (byte in byteArray) {
-            val index = (crc32 and 0xFF) xor byte.toUByte().toInt()
-            crc32 = (crc32 ushr 8) xor crc32Table[index]
-        }
-
+        val crc32 = calculateCRC32Loop(byteArray)
         return crc32.inv() and 0xFFFFFFFF.toInt()
     }
 
-    fun calculateCRC32(byteArray: ByteArray, prevCalculatedCrc: Int): Int {
-        // Reference implementation that I ported to kotlin
-        // https://www.rosettacode.org/wiki/CRC-32#C
-        var crc32 = prevCalculatedCrc
+    /**
+     * This function contains the loop of the CRC32 calculation and allows for the use of a precalculated part,
+     * as well as when nothing is precomputed
+     *
+     * @param byteArray is the ByteArray for which we calculate the checksum
+     * @param crc32Start is the crc value from which we work further, the default value is the normal CRC32 without pre-computation
+     * return the (almost) crc32 value that is calculated, only some minor logic operations need to be performed for the final CRC32
+     */
+    fun calculateCRC32Loop(byteArray: ByteArray, crc32Start: Int = 0xFFFFFFFF.toInt()): Int {
+        var crc32 = crc32Start
         for (byte in byteArray) {
             val index = (crc32 and 0xFF) xor byte.toUByte().toInt()
             crc32 = (crc32 ushr 8) xor crc32Table[index]
         }
+        return crc32
+    }
 
+    /**
+     * Calculate the CRC-32 checksum for a ByteArray, when there is already a part precalculated
+     *
+     * @param byteArray the ByteArray for which we calculate the CRC-32 checksum
+     * @param prevCalculatedCrc is the precalculated value from calculateCRC32Loop
+     * @return CRC-32 checksum
+     */
+    fun calculateCRC32(byteArray: ByteArray, prevCalculatedCrc: Int): Int {
+        val crc32 = calculateCRC32Loop(byteArray, crc32Start = prevCalculatedCrc)
         return crc32.inv() and 0xFFFFFFFF.toInt()
     }
 }

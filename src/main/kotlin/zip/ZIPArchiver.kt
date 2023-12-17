@@ -29,16 +29,21 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         this.zip.writeBytes(byteArrayOf())
         val crc32Bruteforcer = CRC32Bruteforcer()
 
-//        // Compress the file
-//        val file = File(inputFilePath)
-//
-//        val compressedStream = this.getDeflateStream(file)
-//        val lh = this.getLocalFileHeader(file.name, compressedStream.size, file.length().toInt(), getByteArrayOf4Bytes(calculateCRC32(file.readBytes())))
-//        this.zip.appendBytes(lh)
-//        this.zip.appendBytes(compressedStream)
+        // Compress the file
+        val file = File(inputFilePath)
+
+        print("Compressing the given file...\r")
+        val compressedStream = this.getDeflateStream(file)
+        val lh = this.getLocalFileHeader(file.name, compressedStream.size, file.length().toInt(), getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes())))
+        val cd = this.getCentralDirectoryFileHeader(file.name, compressedStream.size, 0, file.length().toInt())
+        this.zip.appendBytes(lh)
+        this.zip.appendBytes(compressedStream)
+
+        println("Compressing the given file... Done")
 
         // ### Quine ###
         val backup = this.zip.readBytes()
+        print("Generating the quine...\r")
 
         // Generate quine of the right size, but the local file header will still be wrong
         // Create right size header
@@ -49,7 +54,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         // Create right size footer
         var cd_quine = this.getCentralDirectoryFileHeader(this.zipName, 0, 0, 0)
         var endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
-        var footer = cd_quine + endCd
+        var footer = cd + cd_quine + endCd
 
         var quine = this.generateQuine(this.zip.readBytes(), footer)
         this.zip.appendBytes(quine)
@@ -62,23 +67,24 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         lh_quine = this.getLocalFileHeader(this.zipName, quine.size, totalSize, getByteArrayOf4Bytes(0))
         fullZipFile += lh_quine
 
-        cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, 0, totalSize, getByteArrayOf4Bytes(0))
+        cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize, getByteArrayOf4Bytes(0))
         endCd = this.getEndOfCentralDirectoryRecord(
-            1,
-            fullZipFile.size + quine.size + cd_quine.size - offset,
+            2,
+            fullZipFile.size + quine.size + cd.size + cd_quine.size - offset,
             offset
         )
-        footer = cd_quine + endCd
+        footer = cd + cd_quine + endCd
 
         quine = this.generateQuine(fullZipFile, footer)
         fullZipFile += quine
 
         // Zip tail
         fullZipFile += footer
+        println("Generating the quine... Done")
 
         // Bruteforce zip without recalculating the quine each time
         if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, backup.size, lh_quine.size)
+            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, backup.size, lh_quine.size, cd.size)
             this.zip.writeBytes(finalFile)
         } else {
             this.zip.writeBytes(fullZipFile)

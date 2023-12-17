@@ -27,8 +27,6 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
         var currentIndex = 0
 
         while (currentIndex < inputBytes.size) {
-            print("LZ77: [" + "#".repeat((currentIndex * 10).floorDiv(inputBytes.size)) + " ".repeat(10 - (currentIndex * 10).floorDiv(inputBytes.size)) + "] [1/2]\r")
-
             val (maxMatchLength, maxMatchOffset) = findLongestRepeatedOccurrenceInWindow(inputBytes, currentIndex)
 
             if (maxMatchLength >= minlength) {
@@ -39,7 +37,6 @@ class LZ77Compressor(private val windowSize: Int = 32 * 1024, private val lookah
                 currentIndex++
             }
         }
-        print("LZ77: [##########] [1/2]\n")
 
         return compressedTokens
     }

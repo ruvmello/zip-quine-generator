@@ -2,6 +2,7 @@ package utils
 
 fun findLastSublistOfByteArray(list: ByteArray, sublist: ByteArray): Int {
     var index = 0
+    var lastIndex = -1
     while (index < list.size) {
         if (list[index] == sublist[0]) {
             var isSublist = true
@@ -13,13 +14,14 @@ fun findLastSublistOfByteArray(list: ByteArray, sublist: ByteArray): Int {
                 }
             }
             if (isSublist) {
-                return index
+                lastIndex = index
+                index++
             }
         } else {
             index++
         }
     }
-    return -1
+    return lastIndex
 }
 
 /**
