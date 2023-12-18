@@ -62,7 +62,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
 
         // Now that we know the compressed size, make quine with the right local file header and calculate right crc
         var fullZipFile = backup.copyOf()
-        val totalSize = lh_quine.size + quine.size + footer.size
+        val totalSize = backup.size + lh_quine.size + quine.size + footer.size
 
         lh_quine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
         fullZipFile += lh_quine
