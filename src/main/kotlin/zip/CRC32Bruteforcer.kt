@@ -44,10 +44,8 @@ class CRC32Bruteforcer {
 
                     val byteFormOfCrc = getByteArrayOf4Bytes(crc)
                     var currentCrcFile = byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
-//                    val currentCrcFile = firstPartLh + byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
 
                     if (calculateCRC32(currentCrcFile, prevCalculatedCrc) == crc) {
-//                    if (calculateCRC32(currentCrcFile) == crc) {
                         currentCrcFile = firstPartLh + currentCrcFile
                         result.set(currentCrcFile.clone())
                         resultFound.set(true)
