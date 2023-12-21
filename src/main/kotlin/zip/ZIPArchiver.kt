@@ -4,7 +4,6 @@ import huffman.HuffmanCompressor
 import lz77.LZ77Compressor
 import lz77.LZ77Literal
 import lz77.LZ77Repeat
-import utils.findLastSublistOfByteArray
 import utils.getByteArrayOf2Bytes
 import utils.getByteArrayOf4Bytes
 import java.io.File
@@ -15,7 +14,10 @@ import java.time.LocalDateTime
  *
  * @param zipName the file name to which we write the bytes
  */
-class ZIPArchiver(private val zipName: String = "test.zip", private val debug: Boolean = false, private val noCrc: Boolean = false) {
+class ZIPArchiver(private val zipName: String = "test.zip",
+                  private val debug: Boolean = false,
+                  private val noCrc: Boolean = false,
+                  private val numThreads: Int) {
     private val zip = File(this.zipName)
     private val datetime = LocalDateTime.now()
 
@@ -27,7 +29,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
     fun createZipFile(inputFilePath: String) {
         // Clear zip file
         this.zip.writeBytes(byteArrayOf())
-        val crc32Bruteforcer = CRC32Bruteforcer()
+        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
 
         // Compress the file
         val file = File(inputFilePath)

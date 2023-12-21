@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.CountDownLatch
 
-class CRC32Bruteforcer {
+class CRC32Bruteforcer(private val numThreads: Int) {
     private val crc32Table = IntArray(256)
     
     init {
@@ -15,7 +15,6 @@ class CRC32Bruteforcer {
 
     fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): ByteArray {
         val range = Int.MIN_VALUE..Int.MAX_VALUE
-        val numThreads = Runtime.getRuntime().availableProcessors() // Adjust as needed
         val segmentSize: Int = ((range.last.toLong() - range.first.toLong() + 1) / numThreads).toInt()
 
         val firstPartLh = fullZipFile.copyOfRange(0, backupSize + 14)
