@@ -70,8 +70,9 @@ class CRC32Bruteforcer {
         return if (resultFound.get()) {
             result.get()
         } else {
-            assert(false) { "No CRC32 is found." }
-            byteArrayOf()
+            println("Warning: No CRC32 is found, using 0 instead.")
+            val byteFormOfCrc = getByteArrayOf4Bytes(0)
+            firstPartLh + byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
         }
     }
 

@@ -42,6 +42,7 @@ class ZIPArchiver(private val zipName: String = "test.zip", private val debug: B
         println("Compressing the given file... Done")
 
         // ### Quine ###
+        // TODO: Check the header/footer fields as 7z still does not want to unzip
         val backup = this.zip.readBytes()
         print("Generating the quine...\r")
 
