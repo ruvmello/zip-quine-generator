@@ -8,6 +8,7 @@ import utils.getByteArrayOf2Bytes
 import utils.getByteArrayOf4Bytes
 import java.io.File
 import java.time.LocalDateTime
+import kotlin.system.exitProcess
 
 /**
  * Class that constructs the zip archive, this class handles the byte order
@@ -26,26 +27,48 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      *
      * @param inputFilePath the file path that needs to be encoded in the zip
      */
-    fun createZipFile(inputFilePath: String) {
+    fun createZipFile(inputFiles: List<String>) {
         // Clear zip file
         this.zip.writeBytes(byteArrayOf())
         val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
 
-        // Compress the file
-        val file = File(inputFilePath)
+        // Compress the files
+        print("Compressing the given files...\r")
+        var cd = byteArrayOf()
+        for (filePath in inputFiles) {
+            val file = File(filePath)
 
-        print("Compressing the given file...\r")
-        val compressedStream = this.getDeflateStream(file)
-        val lh = this.getLocalFileHeader(file.name, compressedStream.size, file.length().toInt(), getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes())))
-        val cd = this.getCentralDirectoryFileHeader(file.name, compressedStream.size, 0, file.length().toInt(), getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes())))
-        this.zip.appendBytes(lh)
-        this.zip.appendBytes(compressedStream)
+            val compressedStream = this.getDeflateStream(file)
+            val lh = this.getLocalFileHeader(
+                file.name,
+                compressedStream.size,
+                file.length().toInt(),
+                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+            )
+            cd += this.getCentralDirectoryFileHeader(
+                file.name,
+                compressedStream.size,
+                this.zip.length().toInt(),
+                file.length().toInt(),
+                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+            )
+            this.zip.appendBytes(lh)
+            this.zip.appendBytes(compressedStream)
+        }
 
-        println("Compressing the given file... Done")
+        println("Compressing the given files... Done")
 
         // ### Quine ###
         // TODO: Check the header/footer fields as 7z still does not want to unzip
         val backup = this.zip.readBytes()
+
+        // Check if it is possible to create a quine
+        if (backup.size + 5 > 256 * 256) {
+            this.zip.delete()
+            println("The input file is too big. Only files that are smaller than 32KiB when compressed are possible to fit inside a zip quine.")
+            exitProcess(0)
+        }
+
         print("Generating the quine...\r")
 
         // Generate quine of the right size, but the local file header will still be wrong
@@ -72,7 +95,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
 
         cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
-            2,
+            inputFiles.size + 1,
             fullZipFile.size + quine.size + cd.size + cd_quine.size - offset,
             offset
         )

@@ -3,7 +3,7 @@ import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     val arguments = args.toMutableList()
-    var inputFilePath: String? = null
+    val inputFiles = mutableListOf<String>()
     var outputFilePath: String? = null
     var debug = false
     var noCrc = false
@@ -21,19 +21,16 @@ fun main(args: Array<String>) {
             "--debug" -> debug = true
             "--no-crc" -> noCrc = true
             "--num-threads" -> numThreads = arguments.removeAt(0).toInt()
-            else -> inputFilePath = option
+            else -> inputFiles.add(option)
         }
     }
 
-    if (inputFilePath == null) {
-        println("There is no file given as input.")
-        println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug] [--no-crc]")
+    if (outputFilePath == null) {
+        println("Please specify where to output the file by using the -o option. For more information use --help.")
         exitProcess(0)
     }
 
-    if (outputFilePath == null)
-        outputFilePath = inputFilePath.substringBeforeLast('.') + ".zip"
 
     val archiver = ZIPArchiver(outputFilePath, debug, noCrc, numThreads)
-    archiver.createZipFile(inputFilePath)
+    archiver.createZipFile(inputFiles)
 }

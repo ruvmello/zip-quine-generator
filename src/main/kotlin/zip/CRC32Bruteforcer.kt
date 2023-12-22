@@ -54,6 +54,8 @@ class CRC32Bruteforcer(private val numThreads: Int) {
                         resultFound.set(true)
                         break
                     }
+
+                    // Every 10 seconds update the progress
                     val iter = doneIterations.incrementAndGet()
                     if (System.currentTimeMillis() - currentTime > 10000) {
                         currentTime = System.currentTimeMillis()
@@ -73,7 +75,7 @@ class CRC32Bruteforcer(private val numThreads: Int) {
             e.printStackTrace()
         }
 
-        println("Starting bruteforcing the CRC32... Done (${doneIterations.get()} / ${totalIterations} - ${(doneIterations.get().toDouble() / totalIterations).toString().take(4)}%)")
+        println("Starting bruteforcing the CRC32... Done (${doneIterations.get()} / ${totalIterations} - ${(doneIterations.get().toDouble() * 100 / totalIterations).toString().take(4)}%)")
 
         return if (resultFound.get()) {
             result.get()
