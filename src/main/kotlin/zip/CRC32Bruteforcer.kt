@@ -5,6 +5,7 @@ import utils.getByteArrayOf4Bytes
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicLong
 
 class CRC32Bruteforcer(private val numThreads: Int) {
     private val crc32Table = IntArray(256)
@@ -27,15 +28,18 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         val prevCalculatedCrc = calculateCRC32Loop(firstPartLh)
 
         val resultFound = AtomicBoolean(false)
+        val doneIterations = AtomicLong(0L)
+        val totalIterations = UInt.MAX_VALUE.toLong()
         val result = AtomicReference<ByteArray>()
 
         val latch = CountDownLatch(numThreads)
-        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (this might take a while)\r")
+        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (0.00%)\r")
         for (i in 0 until numThreads) {
             val start = range.first + i * segmentSize
             val end = if (i == numThreads - 1) range.last else start + segmentSize - 1
 
             val thread = Thread {
+                var currentTime = System.currentTimeMillis()
                 for (crc in start..end) {
                     if (resultFound.get()) {
                         break
@@ -49,6 +53,11 @@ class CRC32Bruteforcer(private val numThreads: Int) {
                         result.set(currentCrcFile.clone())
                         resultFound.set(true)
                         break
+                    }
+                    val iter = doneIterations.incrementAndGet()
+                    if (System.currentTimeMillis() - currentTime > 10000) {
+                        currentTime = System.currentTimeMillis()
+                        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (${(iter.toDouble() * 100 / totalIterations).toString().take(4)}%)\r")
                     }
                 }
 
@@ -64,7 +73,7 @@ class CRC32Bruteforcer(private val numThreads: Int) {
             e.printStackTrace()
         }
 
-        println("Starting bruteforcing the CRC32... Done")
+        println("Starting bruteforcing the CRC32... Done (${doneIterations.get()} / ${totalIterations} - ${(doneIterations.get().toDouble() / totalIterations).toString().take(4)}%)")
 
         return if (resultFound.get()) {
             result.get()

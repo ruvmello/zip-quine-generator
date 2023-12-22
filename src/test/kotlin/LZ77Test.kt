@@ -53,7 +53,7 @@ class LZ77Test {
     @Test
     fun test() {
         val file = File("d.zip")
-        val crc = CRC32Bruteforcer()
+        val crc = CRC32Bruteforcer(1)
         val value = getByteArrayOf4Bytes(crc.calculateCRC32(file.readBytes()))
         for (b in value) {
             val st = String.format("%02X", b)
@@ -66,7 +66,7 @@ class LZ77Test {
         val file = File("d.zip").readBytes()
         val part1 = file.copyOfRange(0, file.size / 2)
         val part2 = file.copyOfRange(file.size / 2, file.size)
-        val crc = CRC32Bruteforcer()
+        val crc = CRC32Bruteforcer(1)
         for (b in getByteArrayOf4Bytes(crc.calculateCRC32(file))) {
             val st = String.format("%02X", b)
             print(st)
