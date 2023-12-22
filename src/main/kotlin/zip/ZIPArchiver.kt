@@ -125,8 +125,8 @@ class ZIPArchiver(private val zipName: String = "test.zip",
     /**
      * Create the actual quine. This is the implementation of the reworked quine I made.
      *
-     * @param zipPrefix is the header of the quine. This is shown as [P] in the quine.
-     * @param footer is the footer of the quine. This is shown as [S] in the quine.
+     * @param zipPrefix is the header of the quine. This is shown as P in the quine.
+     * @param footer is the footer of the quine. This is shown as S in the quine.
      * @return the generated quine
      */
     private fun generateQuine(zipPrefix: ByteArray, footer: ByteArray): ByteArray {
