@@ -77,13 +77,13 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         // Generate quine of the right size, but the local file header will still be wrong
         // Create right size header
         var offset = this.zip.length().toInt()
-        var lh_quine = this.getLocalFileHeader(this.zipName, 0, 0)
-        this.zip.appendBytes(lh_quine)
+        var lhQuine = this.getLocalFileHeader(this.zipName, 0, 0)
+        this.zip.appendBytes(lhQuine)
 
         // Create right size footer
-        var cd_quine = this.getCentralDirectoryFileHeader(this.zipName, 0, 0, 0)
+        var cdQuine = this.getCentralDirectoryFileHeader(this.zipName, 0, 0, 0)
         var endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
-        var footer = cd + cd_quine + endCd
+        var footer = cd + cdQuine + endCd
 
         var quine = this.generateQuine(this.zip.readBytes(), footer)
         this.zip.appendBytes(quine)
@@ -91,18 +91,18 @@ class ZIPArchiver(private val zipName: String = "test.zip",
 
         // Now that we know the compressed size, make quine with the right local file header and calculate right crc
         var fullZipFile = backup.copyOf()
-        val totalSize = backup.size + lh_quine.size + quine.size + footer.size
+        val totalSize = backup.size + lhQuine.size + quine.size + footer.size
 
-        lh_quine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
-        fullZipFile += lh_quine
+        lhQuine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
+        fullZipFile += lhQuine
 
-        cd_quine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize)
+        cdQuine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
             inputFiles.size + 1,
-            fullZipFile.size + quine.size + cd.size + cd_quine.size - offset,
+            fullZipFile.size + quine.size + cd.size + cdQuine.size - offset,
             offset
         )
-        footer = cd + cd_quine + endCd
+        footer = cd + cdQuine + endCd
 
         quine = this.generateQuine(fullZipFile, footer)
         fullZipFile += quine
@@ -113,7 +113,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
 
         // Bruteforce zip without recalculating the quine each time
         if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, backup.size, lh_quine.size, cd.size)
+            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, backup.size, lhQuine.size, cd.size)
             this.zip.writeBytes(finalFile)
         } else {
             this.zip.writeBytes(fullZipFile)
@@ -129,7 +129,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      * @param footer is the footer of the quine. This is shown as [S] in the quine.
      * @return the generated quine
      */
-    fun generateQuine(zipPrefix: ByteArray, footer: ByteArray): ByteArray {
+    private fun generateQuine(zipPrefix: ByteArray, footer: ByteArray): ByteArray {
         var quineData = byteArrayOf()
 
         val huffman = HuffmanCompressor()
@@ -202,7 +202,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
             bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
 
             if (repeats.size == 1 && bytesToAdd.size != 5) {
-                val repeat: LZ77Repeat = repeats.get(0)
+                val repeat: LZ77Repeat = repeats[0]
                 bytesToAdd = getFiveByteRepeat(repeat)
             }
 
@@ -296,7 +296,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      * @param token the token that needs to be split in two to fit in 5 bytes
      * @return the ByteArray that is exactly five bytes
      */
-    fun getFiveByteRepeat(token: LZ77Repeat): ByteArray {
+    private fun getFiveByteRepeat(token: LZ77Repeat): ByteArray {
         val huffman = HuffmanCompressor()
         val length = token.length
         val distance = token.distance
@@ -321,7 +321,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      * @param footerSize the size of the footer
      * @return The ByteArray that includes the last repeat token: Rs+y+2
      */
-    fun calculateLastQuineRepeat(footerSize: Int): ByteArray {
+    private fun calculateLastQuineRepeat(footerSize: Int): ByteArray {
         val huffman = HuffmanCompressor()
         var totalLiteralSize = footerSize + 2 * 5   // footer size + 2 * size L0
         val totalRepeats = totalLiteralSize / 258
@@ -356,7 +356,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      * @param isLast indicates if it is the last block
      * @return the ByteArray that contains the header of the stored block
      */
-    fun getLiteralWithSize(size: Int, isLast: Boolean = false): ByteArray {
+    private fun getLiteralWithSize(size: Int, isLast: Boolean = false): ByteArray {
         return if(!isLast) byteArrayOf(0.toByte()) + getByteArrayOf2Bytes(size) +
                 getByteArrayOf2Bytes(size.inv()) else byteArrayOf(128.toByte()) + getByteArrayOf2Bytes(size) +
                 getByteArrayOf2Bytes(size.inv())

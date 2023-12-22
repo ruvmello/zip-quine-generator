@@ -7,6 +7,11 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicLong
 
+/**
+ * This class takes care of the brute-forcing of the CRC-32 checksum
+ *
+ * @param numThreads is the number of threads used for the brute-forcing
+ */
 class CRC32Bruteforcer(private val numThreads: Int) {
     private val crc32Table = IntArray(256)
     
@@ -14,6 +19,16 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         this.calculateTable()
     }
 
+    /**
+     * This method tries to bruteforce the CRC-32 checksum and uses multithreading to do so.
+     *
+     * @param fullZipFile The zip file for which we want to bruteforce the CRC-32
+     * @param quine is the quine itself
+     * @param backupSize is the size of the header before the quine itself
+     * @param lhQuineSize is the size of the local file header of the quine itself
+     * @param cdSize is the size of the central directory
+     * @return the ByteArray of the full file that contains the right checksum, if no checksum is found we just use 0
+     */
     fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): ByteArray {
         val range = Int.MIN_VALUE..Int.MAX_VALUE
         val segmentSize: Int = ((range.last.toLong() - range.first.toLong() + 1) / numThreads).toInt()
@@ -33,7 +48,7 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         val result = AtomicReference<ByteArray>()
 
         val latch = CountDownLatch(numThreads)
-        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (0.00%)\r")
+        print("Starting brute-forcing the CRC32 using $numThreads threads... (0.00%)\r")
         for (i in 0 until numThreads) {
             val start = range.first + i * segmentSize
             val end = if (i == numThreads - 1) range.last else start + segmentSize - 1
@@ -59,7 +74,7 @@ class CRC32Bruteforcer(private val numThreads: Int) {
                     val iter = doneIterations.incrementAndGet()
                     if (System.currentTimeMillis() - currentTime > 10000) {
                         currentTime = System.currentTimeMillis()
-                        print("Starting bruteforcing the CRC32 using ${numThreads} threads... (${(iter.toDouble() * 100 / totalIterations).toString().take(4)}%)\r")
+                        print("Starting brute-forcing the CRC32 using $numThreads threads... (${(iter.toDouble() * 100 / totalIterations).toString().take(4)}%)\r")
                     }
                 }
 
@@ -75,7 +90,7 @@ class CRC32Bruteforcer(private val numThreads: Int) {
             e.printStackTrace()
         }
 
-        println("Starting bruteforcing the CRC32... Done (${doneIterations.get()} / ${totalIterations} - ${(doneIterations.get().toDouble() * 100 / totalIterations).toString().take(4)}%)")
+        println("Starting brute-forcing the CRC32... Done (${doneIterations.get()} / $totalIterations - ${(doneIterations.get().toDouble() * 100 / totalIterations).toString().take(4)}%)")
 
         return if (resultFound.get()) {
             result.get()
