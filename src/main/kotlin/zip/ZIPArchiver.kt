@@ -14,6 +14,9 @@ import kotlin.system.exitProcess
  * Class that constructs the zip archive, this class handles the byte order
  *
  * @param zipName the file name to which we write the bytes
+ * @param debug this controls if debug data needs to be printed
+ * @param noCrc if this value is set to true, we don't bruteforce the CRC-32
+ * @param numThreads the number of threads used for brute-forcing
  */
 class ZIPArchiver(private val zipName: String = "test.zip",
                   private val debug: Boolean = false,
@@ -23,9 +26,9 @@ class ZIPArchiver(private val zipName: String = "test.zip",
     private val datetime = LocalDateTime.now()
 
     /**
-     * Create a zip archive of the [inputFilePath] file.
+     * Create a zip quine including the [inputFiles] files.
      *
-     * @param inputFilePath the file path that needs to be encoded in the zip
+     * @param inputFiles the files that need to be included in the archive
      */
     fun createZipFile(inputFiles: List<String>) {
         // Clear zip file
@@ -119,6 +122,13 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         println("ZIP written to ${this.zipName}")
     }
 
+    /**
+     * Create the actual quine. This is the implementation of the reworked quine I made.
+     *
+     * @param zipPrefix is the header of the quine. This is shown as [P] in the quine.
+     * @param footer is the footer of the quine. This is shown as [S] in the quine.
+     * @return the generated quine
+     */
     fun generateQuine(zipPrefix: ByteArray, footer: ByteArray): ByteArray {
         var quineData = byteArrayOf()
 
@@ -280,6 +290,12 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         return quineData
     }
 
+    /**
+     * This method splits a repeat token in two repeat tokens that fit in 5 bytes
+     *
+     * @param token the token that needs to be split in two to fit in 5 bytes
+     * @return the ByteArray that is exactly five bytes
+     */
     fun getFiveByteRepeat(token: LZ77Repeat): ByteArray {
         val huffman = HuffmanCompressor()
         val length = token.length
@@ -298,6 +314,13 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         return byteArrayOf()
     }
 
+    /**
+     * The last repeat of the quine has to include the length of itself.
+     * This method takes care of this.
+     *
+     * @param footerSize the size of the footer
+     * @return The ByteArray that includes the last repeat token: Rs+y+2
+     */
     fun calculateLastQuineRepeat(footerSize: Int): ByteArray {
         val huffman = HuffmanCompressor()
         var totalLiteralSize = footerSize + 2 * 5   // footer size + 2 * size L0
@@ -326,6 +349,13 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         return bytesToAdd
     }
 
+    /**
+     * This method returns a ByteArray that contains the header of a Stored block
+     *
+     * @param size length that needs to be encoded in the stored block
+     * @param isLast indicates if it is the last block
+     * @return the ByteArray that contains the header of the stored block
+     */
     fun getLiteralWithSize(size: Int, isLast: Boolean = false): ByteArray {
         return if(!isLast) byteArrayOf(0.toByte()) + getByteArrayOf2Bytes(size) +
                 getByteArrayOf2Bytes(size.inv()) else byteArrayOf(128.toByte()) + getByteArrayOf2Bytes(size) +
@@ -335,7 +365,11 @@ class ZIPArchiver(private val zipName: String = "test.zip",
     /**
      * Write the local file header to the zip archive we are constructing
      *
-     * @param file the file for which we write the local file header
+     * @param fileName the file name for which we write the local file header
+     * @param compressedSize the compressed size of the file
+     * @param uncompressedSize the original size of the file
+     * @param crc32 the crc-32 value that needs to be included in the header
+     * @return the local file header
      */
     private fun getLocalFileHeader(fileName: String, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0)): ByteArray {
         var data = byteArrayOf()
@@ -383,8 +417,11 @@ class ZIPArchiver(private val zipName: String = "test.zip",
     /**
      * Write the central directory file header to the zip archive we are constructing
      *
-     * @param file the file for which we write the central directory file header
-     * @param compressedSize the compressed size
+     * @param fileName the file name for which we write the local file header
+     * @param compressedSize the compressed size of the file
+     * @param uncompressedSize the original size of the file
+     * @param crc32 the crc-32 value that needs to be included in the header
+     * @return the central directory header
      */
     private fun getCentralDirectoryFileHeader(fileName: String, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0)): ByteArray {
         var data = byteArrayOf()
@@ -478,9 +515,13 @@ class ZIPArchiver(private val zipName: String = "test.zip",
      * This method writes the part of the header that is common for the
      * local file header and the central directory header
      *
-     * @param file the file for which we have to write the header
+     * @param fileNameLength size of the file name
+     * @param compressedSize the compressed size of the file
+     * @param uncompressedSize the original size of the file
+     * @param crc32 the crc-32 value that needs to be included in the header
+     * @return the part that is common of the central directory and the local file header
      * */
-    private fun writeCommonHeader(fileLength: Int, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray): ByteArray {
+    private fun writeCommonHeader(fileNameLength: Int, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray): ByteArray {
         var data = byteArrayOf()
 
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
@@ -511,7 +552,7 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         data += getByteArrayOf4Bytes(uncompressedSize)
 
         // File name length
-        data += getByteArrayOf2Bytes(fileLength)
+        data += getByteArrayOf2Bytes(fileNameLength)
 
         // Extra field length
         data += getByteArrayOf2Bytes(0)
