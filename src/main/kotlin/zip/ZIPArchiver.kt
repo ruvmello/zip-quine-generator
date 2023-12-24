@@ -25,6 +25,47 @@ class ZIPArchiver(private val zipName: String = "test.zip",
     private val zip = File(this.zipName)
     private val datetime = LocalDateTime.now()
 
+    fun createZipLoop(inputFiles: List<String>) {
+        // Clear zip file
+        this.zip.writeBytes(byteArrayOf())
+        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
+
+        val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles)
+
+    }
+
+    fun compressFiles(inputFiles: List<String>): Triple<List<ByteArray>, List<ByteArray>, List<ByteArray>> {
+        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
+
+        print("Compressing the given files...\r")
+        val lh = mutableListOf<ByteArray>()
+        val compressedStream = mutableListOf<ByteArray>()
+        val cd = mutableListOf<ByteArray>()
+        var offset = 0
+        for (filePath in inputFiles) {
+            val file = File(filePath)
+
+            compressedStream.add(this.getDeflateStream(file))
+            lh.add(this.getLocalFileHeader(
+                file.name,
+                compressedStream.last().size,
+                file.length().toInt(),
+                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+            ))
+            cd.add(this.getCentralDirectoryFileHeader(
+                file.name,
+                compressedStream.last().size,
+                offset,
+                file.length().toInt(),
+                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+            ))
+            offset += lh.last().size + compressedStream.last().size
+        }
+        println("Compressing the given files... Done")
+
+        return Triple(lh, compressedStream, cd)
+    }
+
     /**
      * Create a zip quine including the [inputFiles] files.
      *
@@ -34,39 +75,19 @@ class ZIPArchiver(private val zipName: String = "test.zip",
         // Clear zip file
         this.zip.writeBytes(byteArrayOf())
         val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
-
-        // Compress the files
-        print("Compressing the given files...\r")
-        var cd = byteArrayOf()
-        for (filePath in inputFiles) {
-            val file = File(filePath)
-
-            val compressedStream = this.getDeflateStream(file)
-            val lh = this.getLocalFileHeader(
-                file.name,
-                compressedStream.size,
-                file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
-            )
-            cd += this.getCentralDirectoryFileHeader(
-                file.name,
-                compressedStream.size,
-                this.zip.length().toInt(),
-                file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
-            )
-            this.zip.appendBytes(lh)
-            this.zip.appendBytes(compressedStream)
-        }
-
-        println("Compressing the given files... Done")
+        val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles)
 
         // ### Quine ###
         // TODO: Check the header/footer fields as 7z still does not want to unzip
-        val backup = this.zip.readBytes()
+        var header = byteArrayOf()
+        var cd = byteArrayOf()
+        for(i in localHeaders.indices) {
+            header += localHeaders[i] + dataStreams[i]
+            cd += centralDirectories[i]
+        }
 
         // Check if it is possible to create a quine
-        if (backup.size + 5 > 256 * 256) {
+        if (header.size + 5 > 256 * 256) {
             this.zip.delete()
             println("The input file is too big. Only files that are smaller than 32KiB when compressed are possible to fit inside a zip quine.")
             exitProcess(0)
@@ -74,46 +95,35 @@ class ZIPArchiver(private val zipName: String = "test.zip",
 
         print("Generating the quine...\r")
 
-        // Generate quine of the right size, but the local file header will still be wrong
-        // Create right size header
-        var offset = this.zip.length().toInt()
+        // Generate quine of the right size, but the header will still be wrong
         var lhQuine = this.getLocalFileHeader(this.zipName, 0, 0)
-        this.zip.appendBytes(lhQuine)
-
-        // Create right size footer
         var cdQuine = this.getCentralDirectoryFileHeader(this.zipName, 0, 0, 0)
-        var endCd = this.getEndOfCentralDirectoryRecord(1, this.zip.length().toInt() - offset, offset)
+        var endCd = this.getEndOfCentralDirectoryRecord(1, 0, 0)
         var footer = cd + cdQuine + endCd
-
-        var quine = this.generateQuine(this.zip.readBytes(), footer)
-        this.zip.appendBytes(quine)
-        offset = this.zip.length().toInt()
+        var quine = this.generateQuine(header + lhQuine, footer)
 
         // Now that we know the compressed size, make quine with the right local file header and calculate right crc
-        var fullZipFile = backup.copyOf()
-        val totalSize = backup.size + lhQuine.size + quine.size + footer.size
+        var fullZipFile = header
+        val offset = header.size + lhQuine.size + quine.size
+        val totalSize = header.size + lhQuine.size + quine.size + footer.size
 
         lhQuine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
         fullZipFile += lhQuine
-
-        cdQuine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, backup.size, totalSize)
+        cdQuine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, header.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
             inputFiles.size + 1,
             fullZipFile.size + quine.size + cd.size + cdQuine.size - offset,
             offset
         )
         footer = cd + cdQuine + endCd
-
         quine = this.generateQuine(fullZipFile, footer)
-        fullZipFile += quine
 
-        // Zip tail
-        fullZipFile += footer
+        fullZipFile += quine + footer
         println("Generating the quine... Done")
 
         // Bruteforce zip without recalculating the quine each time
         if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, backup.size, lhQuine.size, cd.size)
+            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, header.size, lhQuine.size, cd.size)
             this.zip.writeBytes(finalFile)
         } else {
             this.zip.writeBytes(fullZipFile)

@@ -7,6 +7,7 @@ fun main(args: Array<String>) {
     var outputFilePath: String? = null
     var debug = false
     var noCrc = false
+    var enableLoop = false
     var numThreads = Runtime.getRuntime().availableProcessors()
     while(arguments.isNotEmpty()) {
         when(val option = arguments.removeAt(0)) {
@@ -19,6 +20,7 @@ fun main(args: Array<String>) {
             "--output", "-o" -> outputFilePath = arguments.removeAt(0)
             "--debug" -> debug = true
             "--no-crc" -> noCrc = true
+            "--loop" -> enableLoop = true
             "--num-threads" -> numThreads = arguments.removeAt(0).toInt()
             else -> inputFiles.add(option)
         }
@@ -31,5 +33,9 @@ fun main(args: Array<String>) {
 
 
     val archiver = ZIPArchiver(outputFilePath, debug, noCrc, numThreads)
-    archiver.createZipFile(inputFiles)
+    if (enableLoop) {
+        archiver.createZipLoop(inputFiles)
+    } else {
+        archiver.createZipFile(inputFiles)
+    }
 }
