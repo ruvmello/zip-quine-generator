@@ -26,11 +26,12 @@ fun main(args: Array<String>) {
         }
     }
 
-    if (outputFilePath == null) {
+    if (outputFilePath == null && !enableLoop) {
         println("Please specify where to output the file by using the -o option. For more information use --help.")
         exitProcess(0)
+    } else if (outputFilePath == null) {
+        outputFilePath = "test.zip"
     }
-
 
     val archiver = ZIPArchiver(outputFilePath, debug, noCrc, numThreads)
     if (enableLoop) {
