@@ -25,7 +25,9 @@ class ZIPArchiver(private val zipName: String,
     private val datetime = LocalDateTime.now()
 
     fun createZipLoop(inputFiles: List<String>) {
-        val zip = File(this.zipName)
+        val zipNames = inputFiles.map { it.substringBeforeLast('.').substringAfterLast('/') + ".zip" }
+        val zipName = zipNames[0]
+        val zip = File(zipNames[0])
         // Clear zip file
         zip.writeBytes(byteArrayOf())
         val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
@@ -40,27 +42,33 @@ class ZIPArchiver(private val zipName: String,
         print("Generating the quine...\r")
 
         // Generate quine of the right size, but the header will still be wrong
-        var lhQuine = this.getLocalFileHeader(this.zipName, 0, 0)
-        var cdQuine = this.getCentralDirectoryFileHeader(this.zipName, 0, 0, 0)
+        var lhQuine = this.getLocalFileHeader(zipName, 0, 0)
+        var lhQuine2 = this.getLocalFileHeader(zipNames[1], 0, 0)
+        var cdQuine = this.getCentralDirectoryFileHeader(zipName, 0, 0, 0)
+        var cdQuine2 = this.getCentralDirectoryFileHeader(zipNames[1], 0, 0, 0)
         var endCd = this.getEndOfCentralDirectoryRecord(1, 0, 0)
         var footer = cd + cdQuine + endCd
-        var quine = this.generateQuine(header + lhQuine, footer)
+        var footer2 = centralDirectories[1] + cdQuine2 + endCd
+        var quine = this.generateQuineLoop(header, headers[1], footer + lhQuine, footer2 + lhQuine2, lhQuine.size)
 
         // Now that we know the compressed size, make quine with the right local file header and calculate right crc
-        var fullZipFile = header
-        val offset = header.size + lhQuine.size + quine.size
-        val totalSize = header.size + lhQuine.size + quine.size + footer.size
+        var fullZipFile = header + footer
+        val offset = fullZipFile.size + lhQuine.size + quine.size
+        val totalSize = fullZipFile.size + lhQuine.size + quine.size + footer.size
 
-        lhQuine = this.getLocalFileHeader(this.zipName, quine.size, totalSize)
+        lhQuine = this.getLocalFileHeader(zipName, quine.size, totalSize)
+        lhQuine2 = this.getLocalFileHeader(zipNames[1], quine.size, totalSize)
         fullZipFile += lhQuine
-        cdQuine = this.getCentralDirectoryFileHeader(this.zipName, quine.size, header.size, totalSize)
+        cdQuine = this.getCentralDirectoryFileHeader(zipName, quine.size, header.size + footer.size, totalSize)
+        cdQuine2 = this.getCentralDirectoryFileHeader(zipNames[1], quine.size, header.size + footer.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
-            inputFiles.size + 1,
+            2,
             fullZipFile.size + quine.size + cd.size + cdQuine.size - offset,
             offset
         )
         footer = cd + cdQuine + endCd
-        quine = this.generateQuine(fullZipFile, footer)
+        footer2 = centralDirectories[1] + cdQuine2 + endCd
+        quine = this.generateQuineLoop(header, headers[1], footer + lhQuine, footer2 + lhQuine2, lhQuine.size)
 
         fullZipFile += quine + footer
         println("Generating the quine... Done")
@@ -73,7 +81,7 @@ class ZIPArchiver(private val zipName: String,
             zip.writeBytes(fullZipFile)
         }
 
-        println("ZIP written to ${this.zipName}")
+        println("ZIP written to ${zipName}")
     }
 
     /**
@@ -361,7 +369,7 @@ class ZIPArchiver(private val zipName: String,
      * @param footer is the footer of the quine. This is shown as S in the quine.
      * @return the generated quine
      */
-    private fun generateQuineLoop(zipPrefix: ByteArray, zipPrefix2: ByteArray, footer: ByteArray, footer2: ByteArray): ByteArray {
+    private fun generateQuineLoop(zipPrefix: ByteArray, zipPrefix2: ByteArray, footer: ByteArray, footer2: ByteArray, lhSize: Int): ByteArray {
         var quineData = byteArrayOf()
 
         val huffman = HuffmanCompressor()
@@ -526,7 +534,7 @@ class ZIPArchiver(private val zipName: String,
         getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Ly+z
-        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer2.size) // + 20 for L4, +20 for R4
+        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer2.size - lhSize) // + 20 for L4, +20 for R4
         getLiteralWithSize(lastRepeats.size / 2).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Add to zip
