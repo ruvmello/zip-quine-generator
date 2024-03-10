@@ -6,6 +6,8 @@ import lz77.LZ77Literal
 import lz77.LZ77Repeat
 import utils.getByteArrayOf2Bytes
 import utils.getByteArrayOf4Bytes
+import utils.getRepeatBytes
+import utils.getRepeatBytesWithoutPaddingAtEndOfBlock
 import java.io.File
 import java.time.LocalDateTime
 import kotlin.system.exitProcess
@@ -27,7 +29,8 @@ class ZIPArchiver(private val zipName: String,
     fun createZipLoop(inputFiles: List<String>) {
         val zipNames = inputFiles.map { it.substringBeforeLast('.').substringAfterLast('/') + ".zip" }
         val zipName = zipNames[0]
-        val zip = File(zipNames[0])
+        val zipName2 = zipNames[1]
+        val zip = File(zipName2)
         // Clear zip file
         zip.writeBytes(byteArrayOf())
         val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
@@ -38,39 +41,38 @@ class ZIPArchiver(private val zipName: String,
         val headers = localHeaders.indices.map { localHeaders[it] + dataStreams[it] }
         val header = headers[0]
         val cd = centralDirectories[0]
-        // TODO Change this to work with the zip loop
+
         print("Generating the quine...\r")
 
         // Generate quine of the right size, but the header will still be wrong
         var lhQuine = this.getLocalFileHeader(zipName, 0, 0)
-        var lhQuine2 = this.getLocalFileHeader(zipNames[1], 0, 0)
+        var lhQuine2 = this.getLocalFileHeader(zipName2, 0, 0)
         var cdQuine = this.getCentralDirectoryFileHeader(zipName, 0, 0, 0)
-        var cdQuine2 = this.getCentralDirectoryFileHeader(zipNames[1], 0, 0, 0)
+        var cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, 0, 0, 0)
         var endCd = this.getEndOfCentralDirectoryRecord(1, 0, 0)
         var footer = cd + cdQuine + endCd
         var footer2 = centralDirectories[1] + cdQuine2 + endCd
         var quine = this.generateQuineLoop(header, headers[1], footer + lhQuine, footer2 + lhQuine2, lhQuine.size)
 
         // Now that we know the compressed size, make quine with the right local file header and calculate right crc
-        var fullZipFile = header + footer
-        val offset = fullZipFile.size + lhQuine.size + quine.size
-        val totalSize = fullZipFile.size + lhQuine.size + quine.size + footer.size
+        var fullZipFile = header
+        val offset = fullZipFile.size + footer.size + lhQuine.size + quine.size
+        val totalSize = fullZipFile.size + footer.size + lhQuine.size + quine.size + footer.size
 
         lhQuine = this.getLocalFileHeader(zipName, quine.size, totalSize)
-        lhQuine2 = this.getLocalFileHeader(zipNames[1], quine.size, totalSize)
-        fullZipFile += lhQuine
+        lhQuine2 = this.getLocalFileHeader(zipName2, quine.size, totalSize)
         cdQuine = this.getCentralDirectoryFileHeader(zipName, quine.size, header.size + footer.size, totalSize)
-        cdQuine2 = this.getCentralDirectoryFileHeader(zipNames[1], quine.size, header.size + footer.size, totalSize)
+        cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, quine.size, header.size + footer.size, totalSize)
         endCd = this.getEndOfCentralDirectoryRecord(
             2,
-            fullZipFile.size + quine.size + cd.size + cdQuine.size - offset,
+            fullZipFile.size + footer.size + lhQuine.size + quine.size + cd.size + cdQuine.size - offset,
             offset
         )
         footer = cd + cdQuine + endCd
         footer2 = centralDirectories[1] + cdQuine2 + endCd
         quine = this.generateQuineLoop(header, headers[1], footer + lhQuine, footer2 + lhQuine2, lhQuine.size)
 
-        fullZipFile += quine + footer
+        fullZipFile += footer + lhQuine + quine + footer
         println("Generating the quine... Done")
 
         // Bruteforce zip without recalculating the quine each time
@@ -81,7 +83,7 @@ class ZIPArchiver(private val zipName: String,
             zip.writeBytes(fullZipFile)
         }
 
-        println("ZIP written to ${zipName}")
+        println("ZIP written to ${zip.name}")
     }
 
     /**
@@ -398,7 +400,7 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(secondLiteral, false)
         quineData += bytesToAdd
-        distanceToFooter += footer.size + 5
+        distanceToFooter += bytesToAdd.size - 5
 
         // R
         val pAnd1 = firstLiteral.size + secondLiteral.size + 5 // + 5 because of the R1
@@ -427,7 +429,7 @@ class ZIPArchiver(private val zipName: String,
             bytesToAdd = huffman.encodeStoredBlock(rPAndOne, false)
             lXAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
             quineData += bytesToAdd
-            distanceToFooter += lXAndThree.size
+            distanceToFooter += bytesToAdd.size - 5
 
             // L1
             val lX = bytesToAdd.copyOfRange(0, 5)
@@ -438,7 +440,7 @@ class ZIPArchiver(private val zipName: String,
             bytesToAdd = huffman.encodeStoredBlock(literals, false)
             lXAndThree += bytesToAdd
             quineData += bytesToAdd
-            distanceToFooter += 5
+            distanceToFooter += bytesToAdd.size - 5
 
             // Lx+3
             lXAndThree += getLiteralWithSize(lXAndThree.size + 5)
@@ -448,7 +450,7 @@ class ZIPArchiver(private val zipName: String,
             // Add to zip
             bytesToAdd = huffman.encodeStoredBlock(literals, false)
             quineData += bytesToAdd
-            distanceToFooter += lXAndThree.size + 5
+            distanceToFooter += bytesToAdd.size - 5
 
             // Rx+3
             val x = bytesToAdd.copyOfRange(5, bytesToAdd.size)  // Header of L is 5 bytes
@@ -480,7 +482,7 @@ class ZIPArchiver(private val zipName: String,
         bytesToAdd = huffman.encodeStoredBlock(rXAndThree, false)
         lZAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
         quineData += bytesToAdd
-        distanceToFooter += lZAndThree.size
+        distanceToFooter += bytesToAdd.size - 5
 
         // L1
         val lX = bytesToAdd.copyOfRange(0, 5)
@@ -491,7 +493,7 @@ class ZIPArchiver(private val zipName: String,
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
         lZAndThree += bytesToAdd
         quineData += bytesToAdd
-        distanceToFooter += 5
+        distanceToFooter += bytesToAdd.size - 5
 
         // Lz+3
         lZAndThree += getLiteralWithSize(lZAndThree.size + 5)
@@ -501,7 +503,7 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
         quineData += bytesToAdd
-        distanceToFooter += lZAndThree.size + 5
+        distanceToFooter += bytesToAdd.size - 5
 
         // Rz+3
         val bytesR4 = byteArrayOf(0x42, 0x88.toByte(), 0x21, 0xc4.toByte(), 0x00)
@@ -521,7 +523,7 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literal, false)
         quineData += bytesToAdd
-        distanceToFooter += 20
+        distanceToFooter += bytesToAdd.size - 5
 
         // R4
         quineData += bytesR4
@@ -534,9 +536,9 @@ class ZIPArchiver(private val zipName: String,
         getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Ly+z
-        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer2.size - lhSize) // + 20 for L4, +20 for R4
-        getLiteralWithSize(lastRepeats.size / 2).forEach { literal.add(LZ77Literal(it.toUByte())) }
-
+        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer.size - lhSize) // + 20 for L4, +20 for R4
+        getLiteralWithSize(lastRepeats.size).forEach { literal.add(LZ77Literal(it.toUByte())) }
+        println("Distance: " + (distanceToFooter + 40) + ", size: " +  (footer2.size - lhSize))
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literal, false)
         quineData += bytesToAdd
@@ -551,7 +553,7 @@ class ZIPArchiver(private val zipName: String,
         quineData += getLiteralWithSize(0)
 
         // Ly+z
-        quineData += getLiteralWithSize(lastRepeats.size / 2) + lastRepeats
+        quineData += getLiteralWithSize(lastRepeats.size) + lastRepeats
 
         // Rz Ry
         quineData += lastRepeats
@@ -624,40 +626,27 @@ class ZIPArchiver(private val zipName: String,
      * This method takes care of this.
      *
      * @param distanceToFooter the distance to the footer
+     * @param footerSize the size of the footer
      * @return The ByteArray that includes the last repeat tokens: Rz Ry
      */
     private fun calculateLastQuineRepeatLoop(distanceToFooter: Int, footerSize: Int): ByteArray {
-        val huffman = HuffmanCompressor()
-        var totalLiteralSize = distanceToFooter // + ?, Need to find 2x Rz + Ry
-        var totalRepeats = footerSize / 258
-        var tokens = mutableListOf<LZ77Repeat>()
-        for (i in 1..totalRepeats) {
-            tokens.add(LZ77Repeat(totalLiteralSize, 258))
-        }
-        tokens.add(LZ77Repeat(totalLiteralSize, footerSize % 258))
-        // Ry without Rz size
-        var bytesToAdd = huffman.encode(tokens)
+        // Ry without accounting Rz size
+        var total_distance = distanceToFooter + 2 * getRepeatBytes(distanceToFooter, footerSize).size + 2   // TODO: Why +2 needed, fix this so it is automatically correct
+        var bytesToAdd = getRepeatBytes(total_distance, footerSize)
+        println("Total distance: $total_distance, ${distanceToFooter + 2 * bytesToAdd.size}")
 
         val huffman2 = HuffmanCompressor()
-        totalLiteralSize = bytesToAdd.size
-        totalRepeats = totalLiteralSize / 258
-        tokens = mutableListOf()
-        for (i in 1..totalRepeats) {
-            tokens.add(LZ77Repeat(totalLiteralSize, 258))
-        }
-        tokens.add(LZ77Repeat(totalLiteralSize, totalLiteralSize % 258))
-        // Rz without Ry size
-        bytesToAdd = huffman2.encodeRepeatStaticBlock(tokens, isLast = false)
+        // Rw without accounting itself and Ry without Rw size
+        val size_Ry = bytesToAdd.size
+        bytesToAdd = getRepeatBytesWithoutPaddingAtEndOfBlock(size_Ry, size_Ry, isLast = false)
+        // TODO: Why +1 needed? --> Fix that it is automatically right
+        bytesToAdd = getRepeatBytesWithoutPaddingAtEndOfBlock(bytesToAdd.size + size_Ry + 1, bytesToAdd.size + size_Ry + 1, huffman2, isLast = false)
 
         // With Rz size
-        tokens = mutableListOf()
-        for (i in 1..footerSize / 258) {
-            tokens.add(LZ77Repeat(distanceToFooter + bytesToAdd.size * 2 + totalLiteralSize, 258))
-        }
-        tokens.add(LZ77Repeat(distanceToFooter + bytesToAdd.size * 2 + totalLiteralSize, footerSize % 258))
-
-        val lastRepeat = huffman2.encodeRepeatStaticBlock(tokens, isLast = true)
-        bytesToAdd = bytesToAdd + lastRepeat + bytesToAdd + lastRepeat
+        total_distance += 2 * bytesToAdd.size
+        val lastRepeat = getRepeatBytes(total_distance, footerSize, huffman = huffman2)
+        bytesToAdd = bytesToAdd + lastRepeat
+        println("Total distance 2: ${total_distance}")
 
         return bytesToAdd
     }

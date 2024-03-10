@@ -14,7 +14,7 @@ fun main(args: Array<String>) {
             "--help", "-h" -> {
                 println("This program aims to create a zip quine.")
                 println("The created zip contains the input file, as well as the zip itself.")
-                println("Usage: ./zipQuine inputFile [-o outputFile] [-h] [--debug] [--no-crc] [--num-threads number_of_threads]")
+                println("Usage: ./zipQuine inputFile [-o outputFile (ignored when using loop)] [-h] [--debug] [--no-crc] [--num-threads number_of_threads] [--loop]")
                 exitProcess(0)
             }
             "--output", "-o" -> outputFilePath = arguments.removeAt(0)
