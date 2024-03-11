@@ -24,9 +24,13 @@ class ZIPArchiver(private val zipName: String,
                   private val debug: Boolean,
                   private val noCrc: Boolean,
                   private val numThreads: Int) {
+
     private val datetime = LocalDateTime.now()
+    private val extraFieldString = "Made By Ruben Van Mello for his master's thesis at the University of Ghent on the generation of zip quines"
 
     fun createZipLoop(inputFiles: List<String>) {
+        assert(inputFiles.size == 2) {"A quine loop only supports two files maximum as of the current implementation"}
+
         val zipNames = inputFiles.map { it.substringBeforeLast('.').substringAfterLast('/') + ".zip" }
         val zipName = zipNames[0]
         val zipName2 = zipNames[1]
@@ -36,19 +40,51 @@ class ZIPArchiver(private val zipName: String,
         val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
 
         // Get all lh's, compressed streams, cd's
-        val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles, loopEnabled = true)
+        var (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles, loopEnabled = true)
+        var headers = localHeaders.indices.map { localHeaders[it] + dataStreams[it] }
+        print("Generating the quine...\r")
 
-        val headers = localHeaders.indices.map { localHeaders[it] + dataStreams[it] }
+        // Make header sizes equal
+        val differenceHeader = headers[0].size - headers[1].size
+        var headerExtraField = ""
+        var headerExtraField2 = ""
+        if (differenceHeader < 0) {
+            headerExtraField = this.extraFieldString.substring(0, -differenceHeader)
+        } else if (differenceHeader > 0) {
+            headerExtraField2 = this.extraFieldString.substring(0, differenceHeader)
+        }
+
+        // Add data in extraField so that each lh + data is equal in size
+        val newLocalHeaders = listOf(
+            localHeaders[0].copyOfRange(0, 28) + getByteArrayOf2Bytes(headerExtraField.length) + localHeaders[0].copyOfRange(30, localHeaders[0].size) + headerExtraField.toByteArray(),
+            localHeaders[1].copyOfRange(0, 28) + getByteArrayOf2Bytes(headerExtraField2.length) + localHeaders[1].copyOfRange(30, localHeaders[1].size) + headerExtraField2.toByteArray()
+        )
+
+        // lhQuine and lhQuine2 must have the same size, so if filename is not equally long, add bytes in the extraField
+        val differenceFooter = zipName.length - zipName2.length
+        var footerExtraField = ""
+        var footerExtraField2 = ""
+        if (differenceFooter < 0) {
+            footerExtraField = this.extraFieldString.substring(0, -differenceFooter)
+        } else if (differenceFooter > 0) {
+            footerExtraField2 = this.extraFieldString.substring(0, differenceFooter)
+        }
+
+        // Add data in extraField so that each lh + data is equal in size
+        centralDirectories = listOf(
+            centralDirectories[0].copyOfRange(0, 30) + getByteArrayOf2Bytes(footerExtraField.length) + centralDirectories[0].copyOfRange(32, centralDirectories[0].size) + footerExtraField.toByteArray(),
+            centralDirectories[1].copyOfRange(0, 30) + getByteArrayOf2Bytes(footerExtraField2.length) + centralDirectories[1].copyOfRange(32, centralDirectories[1].size) + footerExtraField2.toByteArray()
+        )
+
+        headers = newLocalHeaders.indices.map { newLocalHeaders[it] + dataStreams[it] }
         val header = headers[0]
         val cd = centralDirectories[0]
 
-        print("Generating the quine...\r")
-
         // Generate quine of the right size, but the header will still be wrong
-        var lhQuine = this.getLocalFileHeader(zipName, 0, 0)
-        var lhQuine2 = this.getLocalFileHeader(zipName2, 0, 0)
-        var cdQuine = this.getCentralDirectoryFileHeader(zipName, 0, 0, 0)
-        var cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, 0, 0, 0)
+        var lhQuine = this.getLocalFileHeader(zipName, 0, 0, extraField = footerExtraField)
+        var lhQuine2 = this.getLocalFileHeader(zipName2, 0, 0, extraField = footerExtraField2)
+        var cdQuine = this.getCentralDirectoryFileHeader(zipName, 0, 0, 0, extraField = footerExtraField)
+        var cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, 0, 0, 0, extraField = footerExtraField2)
         var endCd = this.getEndOfCentralDirectoryRecord(1, 0, 0)
         var footer = cd + cdQuine + endCd
         var footer2 = centralDirectories[1] + cdQuine2 + endCd
@@ -59,10 +95,10 @@ class ZIPArchiver(private val zipName: String,
         val offset = fullZipFile.size + footer.size + lhQuine.size + quine.size
         val totalSize = fullZipFile.size + footer.size + lhQuine.size + quine.size + footer.size
 
-        lhQuine = this.getLocalFileHeader(zipName, quine.size, totalSize)
-        lhQuine2 = this.getLocalFileHeader(zipName2, quine.size, totalSize)
-        cdQuine = this.getCentralDirectoryFileHeader(zipName, quine.size, header.size + footer.size, totalSize)
-        cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, quine.size, header.size + footer.size, totalSize)
+        lhQuine = this.getLocalFileHeader(zipName, quine.size, totalSize, extraField = footerExtraField)
+        lhQuine2 = this.getLocalFileHeader(zipName2, quine.size, totalSize, extraField = footerExtraField2)
+        cdQuine = this.getCentralDirectoryFileHeader(zipName, quine.size, header.size + footer.size, totalSize, extraField = footerExtraField)
+        cdQuine2 = this.getCentralDirectoryFileHeader(zipName2, quine.size, headers[1].size + footer2.size, totalSize, extraField = footerExtraField2)
         endCd = this.getEndOfCentralDirectoryRecord(
             2,
             fullZipFile.size + footer.size + lhQuine.size + quine.size + cd.size + cdQuine.size - offset,
@@ -538,7 +574,7 @@ class ZIPArchiver(private val zipName: String,
         // Ly+z
         val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer.size - lhSize) // + 20 for L4, +20 for R4
         getLiteralWithSize(lastRepeats.size).forEach { literal.add(LZ77Literal(it.toUByte())) }
-        println("Distance: " + (distanceToFooter + 40) + ", size: " +  (footer2.size - lhSize))
+
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literal, false)
         quineData += bytesToAdd
@@ -673,7 +709,7 @@ class ZIPArchiver(private val zipName: String,
      * @param crc32 the crc-32 value that needs to be included in the header
      * @return the local file header
      */
-    private fun getLocalFileHeader(fileName: String, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0)): ByteArray {
+    private fun getLocalFileHeader(fileName: String, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0), extraField: String = ""): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -683,13 +719,16 @@ class ZIPArchiver(private val zipName: String,
         data += zipSignature
         data += zipVersion
 
-        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32)
+        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32, extraField.length)
         data += commonHeader
 
         // File name
         data += fileName.encodeToByteArray()
 
         // Extra field content
+        if (extraField.isNotEmpty()) {
+            data += extraField.toByteArray()
+        }
 
         return data
     }
@@ -725,7 +764,7 @@ class ZIPArchiver(private val zipName: String,
      * @param crc32 the crc-32 value that needs to be included in the header
      * @return the central directory header
      */
-    private fun getCentralDirectoryFileHeader(fileName: String, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0)): ByteArray {
+    private fun getCentralDirectoryFileHeader(fileName: String, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0), extraField: String = ""): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -737,7 +776,7 @@ class ZIPArchiver(private val zipName: String,
         data += zipVersionMadeBy
         data += zipVersionNeededToExtract
 
-        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32)
+        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32, extraField.length)
         data += commonHeader
 
         val comment = ""
@@ -763,7 +802,9 @@ class ZIPArchiver(private val zipName: String,
         data += fileName.encodeToByteArray()
 
         // Extra field content
-        // zip.appendBytes(getByteArrayOf2Bytes(0))
+        if (extraField.isNotEmpty()) {
+            data += extraField.toByteArray()
+        }
 
         // File comment
         if (comment.isNotEmpty())
@@ -823,7 +864,7 @@ class ZIPArchiver(private val zipName: String,
      * @param crc32 the crc-32 value that needs to be included in the header
      * @return the part that is common of the central directory and the local file header
      * */
-    private fun writeCommonHeader(fileNameLength: Int, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray): ByteArray {
+    private fun writeCommonHeader(fileNameLength: Int, compressedSize: Int, uncompressedSize: Int, crc32: ByteArray, extraFieldSize: Int): ByteArray {
         var data = byteArrayOf()
 
         val zipFlags: ByteArray = byteArrayOf(0x00, 0x00)
@@ -857,7 +898,7 @@ class ZIPArchiver(private val zipName: String,
         data += getByteArrayOf2Bytes(fileNameLength)
 
         // Extra field length
-        data += getByteArrayOf2Bytes(0)
+        data += getByteArrayOf2Bytes(extraFieldSize)
 
         return data
     }
