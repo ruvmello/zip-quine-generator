@@ -1,5 +1,8 @@
 package utils
 
+import huffman.HuffmanCompressor
+import lz77.LZ77Repeat
+
 fun findLastSublistOfByteArray(list: ByteArray, sublist: ByteArray): Int {
     var index = 0
     var lastIndex = -1
@@ -22,6 +25,24 @@ fun findLastSublistOfByteArray(list: ByteArray, sublist: ByteArray): Int {
         }
     }
     return lastIndex
+}
+
+fun getRepeatBytes(distance: Int, size: Int, huffman: HuffmanCompressor = HuffmanCompressor()): ByteArray {
+    val tokens = mutableListOf<LZ77Repeat>()
+    for (i in 1..size / 258) {
+        tokens.add(LZ77Repeat(distance, 258))
+    }
+    tokens.add(LZ77Repeat(distance, size % 258))
+    return huffman.encode(tokens)
+}
+
+fun getRepeatBytesWithoutPaddingAtEndOfBlock(distance: Int, size: Int, huffman: HuffmanCompressor = HuffmanCompressor(), isLast: Boolean = false): ByteArray {
+    val tokens = mutableListOf<LZ77Repeat>()
+    for (i in 1..size / 258) {
+        tokens.add(LZ77Repeat(distance, 258))
+    }
+    tokens.add(LZ77Repeat(distance, size % 258))
+    return huffman.encodeRepeatStaticBlock(tokens, isLast)
 }
 
 /**
