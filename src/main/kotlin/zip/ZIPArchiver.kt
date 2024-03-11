@@ -630,25 +630,24 @@ class ZIPArchiver(private val zipName: String,
      * @return The ByteArray that includes the last repeat tokens: Rz Ry
      */
     private fun calculateLastQuineRepeatLoop(distanceToFooter: Int, footerSize: Int): ByteArray {
-        // Ry without accounting Rz size
-        var total_distance = distanceToFooter + 2 * getRepeatBytes(distanceToFooter, footerSize).size + 2   // TODO: Why +2 needed, fix this so it is automatically correct
-        var bytesToAdd = getRepeatBytes(total_distance, footerSize)
-        println("Total distance: $total_distance, ${distanceToFooter + 2 * bytesToAdd.size}")
+        var changed = true
+        var rydistance = distanceToFooter
+        var rwDistanceAndSize = 3
+        var lastRepeats: ByteArray = byteArrayOf()
+        while (changed) {
+            val huffman = HuffmanCompressor()
+            val rw = getRepeatBytesWithoutPaddingAtEndOfBlock(rwDistanceAndSize, rwDistanceAndSize, huffman = huffman)
+            val ry = getRepeatBytes(rydistance, footerSize, huffman = huffman)
 
-        val huffman2 = HuffmanCompressor()
-        // Rw without accounting itself and Ry without Rw size
-        val size_Ry = bytesToAdd.size
-        bytesToAdd = getRepeatBytesWithoutPaddingAtEndOfBlock(size_Ry, size_Ry, isLast = false)
-        // TODO: Why +1 needed? --> Fix that it is automatically right
-        bytesToAdd = getRepeatBytesWithoutPaddingAtEndOfBlock(bytesToAdd.size + size_Ry + 1, bytesToAdd.size + size_Ry + 1, huffman2, isLast = false)
-
-        // With Rz size
-        total_distance += 2 * bytesToAdd.size
-        val lastRepeat = getRepeatBytes(total_distance, footerSize, huffman = huffman2)
-        bytesToAdd = bytesToAdd + lastRepeat
-        println("Total distance 2: ${total_distance}")
-
-        return bytesToAdd
+            if (rydistance != distanceToFooter + 2 * rw.size + 2 * ry.size || rwDistanceAndSize != rw.size + ry.size) {
+                rydistance = distanceToFooter + 2 * rw.size + 2 * ry.size
+                rwDistanceAndSize = rw.size + ry.size
+            } else {
+                changed = false
+                lastRepeats = rw + ry
+            }
+        }
+        return lastRepeats
     }
 
 
