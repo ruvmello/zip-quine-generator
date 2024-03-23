@@ -37,7 +37,7 @@ class ZIPArchiver(private val zipName: String,
         val zip = File(zipName2)
         // Clear zip file
         zip.writeBytes(byteArrayOf())
-//        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
+        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
 
         // Get all lh's, compressed streams, cd's
         var (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles, loopEnabled = true)
@@ -113,8 +113,8 @@ class ZIPArchiver(private val zipName: String,
 
         // Bruteforce zip without recalculating the quine each time
         if (!noCrc) {
-//            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, header.size, lhQuine.size, cd.size)
-//            zip.writeBytes(finalFile)
+            val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, header, headers[1], footer, footer2, lhQuine.size, quine.size)
+            zip.writeBytes(finalFile)
             println("WARNING: Currently we do not support brute-forcing when using --loop, because it would take to long.")
             zip.writeBytes(fullZipFile)
         } else {
