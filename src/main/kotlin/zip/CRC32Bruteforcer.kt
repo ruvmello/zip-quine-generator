@@ -55,14 +55,39 @@ class CRC32Bruteforcer(private val numThreads: Int) {
 
             val thread = Thread {
                 var currentTime = System.currentTimeMillis()
+                var byteFormOfCrc = getByteArrayOf4Bytes(0)
+                var currentCrcFile = byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
+                var index = 0
                 for (crc in start..end) {
                     if (resultFound.get()) {
                         break
                     }
 
-                    val byteFormOfCrc = getByteArrayOf4Bytes(crc)
-                    var currentCrcFile = byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
+                    byteFormOfCrc = getByteArrayOf4Bytes(crc)
+                    currentCrcFile[0] = byteFormOfCrc[0]
+                    currentCrcFile[1] = byteFormOfCrc[1]
+                    currentCrcFile[2] = byteFormOfCrc[2]
+                    currentCrcFile[3] = byteFormOfCrc[3]
 
+                    index += 4 + secondPartLh.size
+                    currentCrcFile[index + 0] = byteFormOfCrc[0]
+                    currentCrcFile[index + 1] = byteFormOfCrc[1]
+                    currentCrcFile[index + 2] = byteFormOfCrc[2]
+                    currentCrcFile[index + 3] = byteFormOfCrc[3]
+
+                    index += 4 + firstPartCd.size
+                    currentCrcFile[index + 0] = byteFormOfCrc[0]
+                    currentCrcFile[index + 1] = byteFormOfCrc[1]
+                    currentCrcFile[index + 2] = byteFormOfCrc[2]
+                    currentCrcFile[index + 3] = byteFormOfCrc[3]
+
+                    index += 4 + secondPartCd.size
+                    currentCrcFile[index + 0] = byteFormOfCrc[0]
+                    currentCrcFile[index + 1] = byteFormOfCrc[1]
+                    currentCrcFile[index + 2] = byteFormOfCrc[2]
+                    currentCrcFile[index + 3] = byteFormOfCrc[3]
+
+                    index = 0
                     if (calculateCRC32(currentCrcFile, prevCalculatedCrc) == crc) {
                         currentCrcFile = firstPartLh + currentCrcFile
                         result.set(currentCrcFile.clone())
