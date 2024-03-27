@@ -413,7 +413,7 @@ class ZIPArchiver(private val zipName: String,
         var quineData = byteArrayOf()
 
         val huffman = HuffmanCompressor()
-        var distanceToFooter = 0
+
         // Lp2+s2+1
         val firstLiteral = mutableListOf<LZ77Literal>()
         zipPrefix2.forEach { firstLiteral.add(LZ77Literal(it.toUByte())) }   // [P2]
@@ -425,7 +425,6 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         var bytesToAdd = huffman.encodeStoredBlock(firstLiteral, false)
         quineData += bytesToAdd
-        distanceToFooter += footer2.size + 5
 
         // Lp1+s1+1
         val secondLiteral = mutableListOf<LZ77Literal>()
@@ -438,7 +437,6 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(secondLiteral, false)
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
 
         // R
         val pAnd1 = firstLiteral.size + secondLiteral.size + 5 // + 5 because of the R1
@@ -452,7 +450,6 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
         quineData += bytesToAdd
-        distanceToFooter += Rlength + 5
 
         // Do it once and if we can't fit the last repeat in under one unit, keep repeating until we can
         do {
@@ -467,7 +464,6 @@ class ZIPArchiver(private val zipName: String,
             bytesToAdd = huffman.encodeStoredBlock(rPAndOne, false)
             lXAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
             quineData += bytesToAdd
-            distanceToFooter += bytesToAdd.size - 5
 
             // L1
             val lX = bytesToAdd.copyOfRange(0, 5)
@@ -478,7 +474,6 @@ class ZIPArchiver(private val zipName: String,
             bytesToAdd = huffman.encodeStoredBlock(literals, false)
             lXAndThree += bytesToAdd
             quineData += bytesToAdd
-            distanceToFooter += bytesToAdd.size - 5
 
             // Lx+3
             lXAndThree += getLiteralWithSize(lXAndThree.size + 5)
@@ -488,7 +483,6 @@ class ZIPArchiver(private val zipName: String,
             // Add to zip
             bytesToAdd = huffman.encodeStoredBlock(literals, false)
             quineData += bytesToAdd
-            distanceToFooter += bytesToAdd.size - 5
 
             // Rx+3
             val x = bytesToAdd.copyOfRange(5, bytesToAdd.size)  // Header of L is 5 bytes
@@ -500,7 +494,6 @@ class ZIPArchiver(private val zipName: String,
 
             // Add to zip
             bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
-            distanceToFooter += x.size
 
             if (repeats.size == 1 && bytesToAdd.size != 5) {
                 val repeat: LZ77Repeat = repeats[0]
@@ -520,7 +513,6 @@ class ZIPArchiver(private val zipName: String,
         bytesToAdd = huffman.encodeStoredBlock(rXAndThree, false)
         lZAndThree += bytesToAdd.copyOfRange(5, bytesToAdd.size)
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
 
         // L1
         val lX = bytesToAdd.copyOfRange(0, 5)
@@ -531,7 +523,6 @@ class ZIPArchiver(private val zipName: String,
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
         lZAndThree += bytesToAdd
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
 
         // Lz+3
         lZAndThree += getLiteralWithSize(lZAndThree.size + 5)
@@ -541,14 +532,12 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literals, false)
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
 
         // Rz+3
         val bytesR4 = byteArrayOf(0x42, 0x88.toByte(), 0x21, 0xc4.toByte(), 0x00)
         bytesToAdd = bytesR4
 
         quineData += bytesToAdd
-        distanceToFooter += 20
 
         // L4
         // Encoding of R4 is constant
@@ -561,41 +550,12 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literal, false)
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
 
         // R4
         quineData += bytesR4
-        distanceToFooter += 20
 
         // L4
-        literal = mutableListOf()
-        bytesR4.forEach { literal.add(LZ77Literal(it.toUByte())) }
-        getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
-        getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
-
-        // Ly+z
-        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer.size - lhSize) // + 20 for L4, +20 for R4
-        getLiteralWithSize(lastRepeats.size).forEach { literal.add(LZ77Literal(it.toUByte())) }
-
-        // Add to zip
-        bytesToAdd = huffman.encodeStoredBlock(literal, false)
-        quineData += bytesToAdd
-
-        // R4
-        quineData += bytesR4
-
-        // L0
-        quineData += getLiteralWithSize(0)
-
-        // L0
-        quineData += getLiteralWithSize(0)
-
-        // Ly+z
-        quineData += getLiteralWithSize(lastRepeats.size) + lastRepeats
-
-        // Rz Ry
-        quineData += lastRepeats
-
+        quineData += getLiteralWithSize(20, isLast = true) + ByteArray(16) { 0 }
         return quineData
     }
 
