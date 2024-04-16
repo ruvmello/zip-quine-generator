@@ -113,10 +113,9 @@ class ZIPArchiver(private val zipName: String,
 
         // Bruteforce zip without recalculating the quine each time
         if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, header, headers[1], footer, footer2, lhQuine.size, quine.size)
+            val secondZip = headers[1] + footer2 + lhQuine2 + this.generateQuineLoop(headers[1], header, footer2 + lhQuine2, footer + lhQuine, lhQuine.size) + footer2
+            val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, secondZip, header, headers[1], footer, footer2, lhQuine.size, quine.size)
             zip.writeBytes(finalFile)
-            println("WARNING: Currently we do not support brute-forcing when using --loop, because it would take to long.")
-            zip.writeBytes(fullZipFile)
         } else {
             zip.writeBytes(fullZipFile)
         }
@@ -574,8 +573,8 @@ class ZIPArchiver(private val zipName: String,
         getLiteralWithSize(0).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Ly+z
-        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 40, footer.size - lhSize) // + 20 for L4, +20 for R4
-        getLiteralWithSize(lastRepeats.size).forEach { literal.add(LZ77Literal(it.toUByte())) }
+        val lastRepeats = calculateLastQuineRepeatLoop(distanceToFooter + 44, footer.size - lhSize) // + 20 for L4, +20 for R4, +4 for reset
+        getLiteralWithSize(lastRepeats.size + 4).forEach { literal.add(LZ77Literal(it.toUByte())) }
 
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(literal, false)
@@ -591,7 +590,7 @@ class ZIPArchiver(private val zipName: String,
         quineData += getLiteralWithSize(0)
 
         // Ly+z
-        quineData += getLiteralWithSize(lastRepeats.size) + lastRepeats
+        quineData += getLiteralWithSize(lastRepeats.size + 4) + byteArrayOf(0xde.toByte(), 0xad.toByte(), 0xbe.toByte(), 0xef.toByte()) + lastRepeats
 
         // Rz Ry
         quineData += lastRepeats
@@ -766,7 +765,7 @@ class ZIPArchiver(private val zipName: String,
      * @param crc32 the crc-32 value that needs to be included in the header
      * @return the central directory header
      */
-    private fun getCentralDirectoryFileHeader(fileName: String, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0), extraField: String = ""): ByteArray {
+    private fun getCentralDirectoryFileHeader(fileName: String, compressedSize: Int, localHeaderOffset: Int, uncompressedSize: Int, crc32: ByteArray = byteArrayOf(0x0, 0x0, 0x0, 0x0), extraField: String = "", crcLoop: Boolean = false): ByteArray {
         var data = byteArrayOf()
 
         // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
@@ -778,7 +777,7 @@ class ZIPArchiver(private val zipName: String,
         data += zipVersionMadeBy
         data += zipVersionNeededToExtract
 
-        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32, extraField.length)
+        val commonHeader = this.writeCommonHeader(fileName.length, compressedSize, uncompressedSize, crc32, if(crcLoop) extraField.length + 4 else extraField.length)
         data += commonHeader
 
         val comment = ""

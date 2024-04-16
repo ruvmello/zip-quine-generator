@@ -126,7 +126,10 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         }
     }
 
-    fun bruteforceLoop(fullZipFile: ByteArray, header: ByteArray, header2: ByteArray, footer: ByteArray, footer2: ByteArray, lhQuineSize: Int, quineSize: Int): ByteArray {
+    fun bruteforceLoop(fullZipFile: ByteArray, secondZip: ByteArray, header: ByteArray, header2: ByteArray, footer: ByteArray, footer2: ByteArray, lhQuineSize: Int, quineSize: Int): ByteArray {
+        val indexOfReset = findLastSublistOfByteArray(fullZipFile, byteArrayOf(0xde.toByte(), 0xad.toByte(), 0xbe.toByte(), 0xef.toByte()))
+        val crcEndofCd = calculateCRC32Loop(fullZipFile.copyOfRange(indexOfReset + 4, fullZipFile.size), 0x00000000)
+
         val range = Int.MIN_VALUE..Int.MAX_VALUE
         val segmentSize: Int = ((range.last.toLong() - range.first.toLong() + 1) / numThreads).toInt()
 
@@ -142,16 +145,9 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         val cdAfterQuine = fullZipFile.copyOfRange(header.size + footer.size + lhQuineSize + 5 + header.size + footer.size + lhQuineSize + 10 + header2.size + footer.size + 18, header.size + footer.size + lhQuineSize + quineSize + indexOfCdInFooter + 16)
         val lastCd = fullZipFile.copyOfRange(header.size + footer.size + lhQuineSize + quineSize + indexOfCdInFooter + 20, fullZipFile.size)
 
-        // Calculate the indexes to create the second zip programmatically without actually unzipping
-        val p1AndS1AndLh = header.size + footer.size + lhQuineSize
-        val indexOfp2AndS2AndLhInQuine = p1AndS1AndLh + 5 + p1AndS1AndLh + 10
-        val firstQuineL = fullZipFile.copyOfRange(p1AndS1AndLh, p1AndS1AndLh + 5)
-        val twoLtokensBetweenSwap = fullZipFile.copyOfRange(p1AndS1AndLh + 5 + p1AndS1AndLh, p1AndS1AndLh + 5 + p1AndS1AndLh + 10)
-        val restOfQuine = fullZipFile.copyOfRange(p1AndS1AndLh + 5 + p1AndS1AndLh + 10 + p1AndS1AndLh, p1AndS1AndLh + quineSize)
-
         val resultFound = AtomicBoolean(false)
         val doneIterations = AtomicLong(0L)
-        val totalIterations = UInt.MAX_VALUE.toULong() * UInt.MAX_VALUE.toULong()
+        val totalIterations = UInt.MAX_VALUE.toLong()
         val result = AtomicReference<ByteArray>()
 
         val latch = CountDownLatch(numThreads)
@@ -162,88 +158,169 @@ class CRC32Bruteforcer(private val numThreads: Int) {
 
             val thread = Thread {
                 var currentTime = System.currentTimeMillis()
-                var index = cdAfterHeader.size
-                var index2 = 0
-                var byteFormOfCrc = getByteArrayOf4Bytes(0)
-                val prevCalculatedPart = cdAfterHeader + byteFormOfCrc + lhQuineAfterFooter + byteFormOfCrc + cdOfSecondZip
-                var currentCrcFile = byteFormOfCrc + lhOfSecondZip + byteFormOfCrc + cdOfFirstZip + byteFormOfCrc + lhOfFirstZip + byteFormOfCrc + cdAfterQuine + byteFormOfCrc + lastCd
+                val crcSecondZip = getByteArrayOf4Bytes(0)
+                val crcFirstZip = getByteArrayOf4Bytes(crcEndofCd)
+                val prevCalculatedPart = cdAfterHeader + crcSecondZip + lhQuineAfterFooter + crcSecondZip + cdOfSecondZip
+                var currentCrcFile = crcFirstZip + lhOfSecondZip + crcFirstZip + cdOfFirstZip + crcSecondZip + lhOfFirstZip + crcSecondZip + cdAfterQuine + crcSecondZip + lastCd
+
+
+                currentCrcFile = prevCalculatedPart + currentCrcFile
+
+                val bytesBeforeReset = currentCrcFile.copyOfRange(0, indexOfReset)
+                val bytesAfterReset = currentCrcFile.copyOfRange(indexOfReset + 4, currentCrcFile.size)
+                val indexOfCdQuine = findLastSublistOfByteArray(bytesAfterReset, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
+                val indexOfCrcInCdQuine = indexOfCdQuine + 16
+
+                val zip2 = secondZip.clone()
                 for (crc in start..end) {
-                    byteFormOfCrc = getByteArrayOf4Bytes(crc)
+                    // This has to go in the quine and the headers of the zip we are making
+                    val newCrc = getByteArrayOf4Bytes(crc)
 
-                    prevCalculatedPart[index] = byteFormOfCrc[0]
-                    prevCalculatedPart[index + 1] = byteFormOfCrc[1]
-                    prevCalculatedPart[index + 2] = byteFormOfCrc[2]
-                    prevCalculatedPart[index + 3] = byteFormOfCrc[3]
-                    index += lhQuineAfterFooter.size + 4
+                    bytesAfterReset[indexOfCrcInCdQuine] = newCrc[0]
+                    bytesAfterReset[indexOfCrcInCdQuine + 1] = newCrc[1]
+                    bytesAfterReset[indexOfCrcInCdQuine + 2] = newCrc[2]
+                    bytesAfterReset[indexOfCrcInCdQuine + 3] = newCrc[3]
 
-                    prevCalculatedPart[index] = byteFormOfCrc[0]
-                    prevCalculatedPart[index + 1] = byteFormOfCrc[1]
-                    prevCalculatedPart[index + 2] = byteFormOfCrc[2]
-                    prevCalculatedPart[index + 3] = byteFormOfCrc[3]
-                    index = cdAfterHeader.size
+                    // This has to go in the quine itself
+                    val crcInt = calculateCRC32(bytesAfterReset, 0x00000000)
+                    val crcOfZip1 = getByteArrayOf4Bytes(crcInt)
 
-                    val prevCalculatedCrc = calculateCRC32Loop(prevCalculatedPart)
-                    for (crc2 in start..end) {
-                        if (resultFound.get()) {
-                            break
-                        }
+                    // Set calculated CRC in quine
+                    currentCrcFile[prevCalculatedPart.size] = crcOfZip1[0]
+                    currentCrcFile[prevCalculatedPart.size + 1] = crcOfZip1[1]
+                    currentCrcFile[prevCalculatedPart.size + 2] = crcOfZip1[2]
+                    currentCrcFile[prevCalculatedPart.size + 3] = crcOfZip1[3]
 
-                        val byteFormOfCrc2 = getByteArrayOf4Bytes(crc2)
-                        currentCrcFile[index2] = byteFormOfCrc2[0]
-                        currentCrcFile[index2 + 1] = byteFormOfCrc2[1]
-                        currentCrcFile[index2 + 2] = byteFormOfCrc2[2]
-                        currentCrcFile[index2 + 3] = byteFormOfCrc2[3]
+                    bytesBeforeReset[prevCalculatedPart.size] = crcOfZip1[0]
+                    bytesBeforeReset[prevCalculatedPart.size + 1] = crcOfZip1[1]
+                    bytesBeforeReset[prevCalculatedPart.size + 2] = crcOfZip1[2]
+                    bytesBeforeReset[prevCalculatedPart.size + 3] = crcOfZip1[3]
 
-                        index2 += 4 + lhOfSecondZip.size
-                        currentCrcFile[index2] = byteFormOfCrc2[0]
-                        currentCrcFile[index2 + 1] = byteFormOfCrc2[1]
-                        currentCrcFile[index2 + 2] = byteFormOfCrc2[2]
-                        currentCrcFile[index2 + 3] = byteFormOfCrc2[3]
+                    zip2[prevCalculatedPart.size] = newCrc[0]
+                    zip2[prevCalculatedPart.size + 1] = newCrc[1]
+                    zip2[prevCalculatedPart.size + 2] = newCrc[2]
+                    zip2[prevCalculatedPart.size + 3] = newCrc[3]
 
-                        index2 += 4 + cdOfFirstZip.size
-                        currentCrcFile[index2] = byteFormOfCrc[0]
-                        currentCrcFile[index2 + 1] = byteFormOfCrc[1]
-                        currentCrcFile[index2 + 2] = byteFormOfCrc[2]
-                        currentCrcFile[index2 + 3] = byteFormOfCrc[3]
+                    currentCrcFile[prevCalculatedPart.size + 4 + lhOfSecondZip.size] = crcOfZip1[0]
+                    currentCrcFile[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 1] = crcOfZip1[1]
+                    currentCrcFile[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 2] = crcOfZip1[2]
+                    currentCrcFile[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 3] = crcOfZip1[3]
 
-                        index2 += 4 + lhOfFirstZip.size
-                        currentCrcFile[index2] = byteFormOfCrc[0]
-                        currentCrcFile[index2 + 1] = byteFormOfCrc[1]
-                        currentCrcFile[index2 + 2] = byteFormOfCrc[2]
-                        currentCrcFile[index2 + 3] = byteFormOfCrc[3]
+                    bytesBeforeReset[prevCalculatedPart.size + 4 + lhOfSecondZip.size] = crcOfZip1[0]
+                    bytesBeforeReset[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 1] = crcOfZip1[1]
+                    bytesBeforeReset[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 2] = crcOfZip1[2]
+                    bytesBeforeReset[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 3] = crcOfZip1[3]
 
-                        index2 += 4 + cdAfterQuine.size
-                        currentCrcFile[index2] = byteFormOfCrc[0]
-                        currentCrcFile[index2 + 1] = byteFormOfCrc[1]
-                        currentCrcFile[index2 + 2] = byteFormOfCrc[2]
-                        currentCrcFile[index2 + 3] = byteFormOfCrc[3]
+                    zip2[prevCalculatedPart.size + 4 + lhOfSecondZip.size] = newCrc[0]
+                    zip2[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 1] = newCrc[1]
+                    zip2[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 2] = newCrc[2]
+                    zip2[prevCalculatedPart.size + 4 + lhOfSecondZip.size + 3] = newCrc[3]
 
-                        index2 = 0
-                        if (calculateCRC32(currentCrcFile, prevCalculatedCrc) == crc) {
-                            val tempFile = prevCalculatedPart + currentCrcFile
-                            val p1AndS1AndLhBytes = tempFile.copyOfRange(0, p1AndS1AndLh)
-                            val p2AndS2AndLhBytes = tempFile.copyOfRange(indexOfp2AndS2AndLhInQuine, indexOfp2AndS2AndLhInQuine + p1AndS1AndLh)
-                            val secondZipFooter = p2AndS2AndLhBytes.copyOfRange(header.size, header.size + footer.size)
-                            val secondZip = p2AndS2AndLhBytes + firstQuineL + p1AndS1AndLhBytes + twoLtokensBetweenSwap + p2AndS2AndLhBytes + restOfQuine + secondZipFooter
-                            if (calculateCRC32(secondZip) == crc2) {
-                                currentCrcFile = prevCalculatedPart + currentCrcFile
-                                result.set(currentCrcFile.clone())
-                                resultFound.set(true)
-                                break
-                            }
-                        }
+                    // Set bruteforced CRC in headers and quine
+                    var index = cdAfterHeader.size
+                    currentCrcFile[index] = newCrc[0]
+                    currentCrcFile[index + 1] = newCrc[1]
+                    currentCrcFile[index + 2] = newCrc[2]
+                    currentCrcFile[index + 3] = newCrc[3]
 
-                        // Every 10 seconds update the progress
-                        val iter = doneIterations.incrementAndGet()
-                        if (System.currentTimeMillis() - currentTime > 10000) {
-                            currentTime = System.currentTimeMillis()
-                            print(
-                                "Starting brute-forcing the CRC32 using $numThreads threads... (${iter} / ${totalIterations})\r"
-                            )
-                        }
+                    bytesBeforeReset[index] = newCrc[0]
+                    bytesBeforeReset[index + 1] = newCrc[1]
+                    bytesBeforeReset[index + 2] = newCrc[2]
+                    bytesBeforeReset[index + 3] = newCrc[3]
+
+                    zip2[index] = crcOfZip1[0]
+                    zip2[index + 1] = crcOfZip1[1]
+                    zip2[index + 2] = crcOfZip1[2]
+                    zip2[index + 3] = crcOfZip1[3]
+
+                    index += 4 + lhQuineAfterFooter.size
+                    currentCrcFile[index] = newCrc[0]
+                    currentCrcFile[index + 1] = newCrc[1]
+                    currentCrcFile[index + 2] = newCrc[2]
+                    currentCrcFile[index + 3] = newCrc[3]
+
+                    bytesBeforeReset[index] = newCrc[0]
+                    bytesBeforeReset[index + 1] = newCrc[1]
+                    bytesBeforeReset[index + 2] = newCrc[2]
+                    bytesBeforeReset[index + 3] = newCrc[3]
+
+                    zip2[index] = crcOfZip1[0]
+                    zip2[index + 1] = crcOfZip1[1]
+                    zip2[index + 2] = crcOfZip1[2]
+                    zip2[index + 3] = crcOfZip1[3]
+
+                    index += 4 + cdOfSecondZip.size + 4 + lhOfSecondZip.size + 4 + cdOfFirstZip.size
+                    currentCrcFile[index] = newCrc[0]
+                    currentCrcFile[index + 1] = newCrc[1]
+                    currentCrcFile[index + 2] = newCrc[2]
+                    currentCrcFile[index + 3] = newCrc[3]
+
+                    bytesBeforeReset[index] = newCrc[0]
+                    bytesBeforeReset[index + 1] = newCrc[1]
+                    bytesBeforeReset[index + 2] = newCrc[2]
+                    bytesBeforeReset[index + 3] = newCrc[3]
+
+                    zip2[index] = crcOfZip1[0]
+                    zip2[index + 1] = crcOfZip1[1]
+                    zip2[index + 2] = crcOfZip1[2]
+                    zip2[index + 3] = crcOfZip1[3]
+
+                    index += 4 + lhOfFirstZip.size
+                    currentCrcFile[index] = newCrc[0]
+                    currentCrcFile[index + 1] = newCrc[1]
+                    currentCrcFile[index + 2] = newCrc[2]
+                    currentCrcFile[index + 3] = newCrc[3]
+
+                    bytesBeforeReset[index] = newCrc[0]
+                    bytesBeforeReset[index + 1] = newCrc[1]
+                    bytesBeforeReset[index + 2] = newCrc[2]
+                    bytesBeforeReset[index + 3] = newCrc[3]
+
+                    zip2[index] = crcOfZip1[0]
+                    zip2[index + 1] = crcOfZip1[1]
+                    zip2[index + 2] = crcOfZip1[2]
+                    zip2[index + 3] = crcOfZip1[3]
+
+                    index += 4 + cdAfterQuine.size
+                    currentCrcFile[index] = newCrc[0]
+                    currentCrcFile[index + 1] = newCrc[1]
+                    currentCrcFile[index + 2] = newCrc[2]
+                    currentCrcFile[index + 3] = newCrc[3]
+
+                    zip2[index] = crcOfZip1[0]
+                    zip2[index + 1] = crcOfZip1[1]
+                    zip2[index + 2] = crcOfZip1[2]
+                    zip2[index + 3] = crcOfZip1[3]
+
+                    // Calculate reset bytes
+                    val resetCrc = calculateCRC32(bytesBeforeReset)
+                    val resetBytes = getByteArrayOf4Bytes(resetCrc.inv())
+
+                    currentCrcFile[indexOfReset] = resetBytes[0]
+                    currentCrcFile[indexOfReset + 1] = resetBytes[1]
+                    currentCrcFile[indexOfReset + 2] = resetBytes[2]
+                    currentCrcFile[indexOfReset + 3] = resetBytes[3]
+
+                    zip2[indexOfReset] = resetBytes[0]
+                    zip2[indexOfReset + 1] = resetBytes[1]
+                    zip2[indexOfReset + 2] = resetBytes[2]
+                    zip2[indexOfReset + 3] = resetBytes[3]
+
+                    // Change to check CRC of zip2
+                    if (calculateCRC32(zip2) == crc) {
+                        result.set(currentCrcFile.clone())
+                        resultFound.set(true)
+                        break
                     }
-                }
 
+                    // Every 10 seconds update the progress
+                    val iter = doneIterations.incrementAndGet()
+                    if (System.currentTimeMillis() - currentTime > 10000) {
+                        currentTime = System.currentTimeMillis()
+                        print("Starting brute-forcing the CRC32 using $numThreads threads... (${(iter.toDouble() * 100 / totalIterations).toString().take(4)}%)\r")
+                    }
+
+                }
                 latch.countDown()
             }
 
