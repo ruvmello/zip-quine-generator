@@ -10,6 +10,7 @@ import utils.getRepeatBytes
 import utils.getRepeatBytesWithoutPaddingAtEndOfBlock
 import java.io.File
 import java.time.LocalDateTime
+import kotlin.math.absoluteValue
 import kotlin.system.exitProcess
 
 /**
@@ -26,7 +27,7 @@ class ZIPArchiver(private val zipName: String,
                   private val numThreads: Int) {
 
     private val datetime = LocalDateTime.now()
-    private val extraFieldString = "Made By Ruben Van Mello for his master's thesis at the University of Ghent on the generation of zip quines"
+    private val extraFieldString = "Made By Ruben Van Mello for his master's thesis at the University of Ghent on the generation of zip quines".repeat(10000)
 
     fun createZipLoop(inputFiles: List<String>) {
         assert(inputFiles.size == 2) {"A quine loop only supports two files maximum as of the current implementation"}
@@ -46,6 +47,13 @@ class ZIPArchiver(private val zipName: String,
 
         // Make header sizes equal
         val differenceHeader = headers[0].size - headers[1].size
+
+        if (differenceHeader.absoluteValue > 256 * 256) {
+            println("The two given files have such a big difference in size that the Extra Field header can not compensate.")
+            println("Unable to create a zip quine with a loop.")
+            exitProcess(0)
+        }
+
         var headerExtraField = ""
         var headerExtraField2 = ""
         if (differenceHeader < 0) {
@@ -62,6 +70,13 @@ class ZIPArchiver(private val zipName: String,
 
         // lhQuine and lhQuine2 must have the same size, so if filename is not equally long, add bytes in the extraField
         val differenceFooter = zipName.length - zipName2.length
+
+        if (differenceFooter.absoluteValue > 256 * 256) {
+            println("The two given files have such a big difference in size that the Extra Field header can not compensate.")
+            println("Unable to create a zip quine with a loop.")
+            exitProcess(0)
+        }
+
         var footerExtraField = ""
         var footerExtraField2 = ""
         if (differenceFooter < 0) {
@@ -179,7 +194,6 @@ class ZIPArchiver(private val zipName: String,
         val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles)
 
         // ### Quine ###
-        // TODO: Check the header/footer fields as 7z still does not want to unzip
         var header = byteArrayOf()
         var cd = byteArrayOf()
         for(i in localHeaders.indices) {
@@ -412,7 +426,7 @@ class ZIPArchiver(private val zipName: String,
         var quineData = byteArrayOf()
 
         val huffman = HuffmanCompressor()
-        var distanceToFooter = 0
+//        var distanceToFooter = 0
         // Lp2+s2+1
         val firstLiteral = mutableListOf<LZ77Literal>()
         zipPrefix2.forEach { firstLiteral.add(LZ77Literal(it.toUByte())) }   // [P2]
@@ -421,10 +435,16 @@ class ZIPArchiver(private val zipName: String,
         // Note: Header of a literal block is 5 bytes, so L1 is 5 bytes
         getLiteralWithSize(firstLiteral.size + 5).forEach { firstLiteral.add(LZ77Literal(it.toUByte())) }   // Lp1+s1+1
 
+        if (firstLiteral.size > 256 * 256) {
+            println("Encoded data is bigger than 64KiB and can thus not fit in one literal block")
+            println("Unable to create zip quine with loop.")
+            exitProcess(0)
+        }
+
         // Add to zip
         var bytesToAdd = huffman.encodeStoredBlock(firstLiteral, false)
         quineData += bytesToAdd
-        distanceToFooter += footer2.size + 5
+        // distanceToFooter += footer2.size + 5
 
         // Lp1+s1+1
         val secondLiteral = mutableListOf<LZ77Literal>()
@@ -437,7 +457,7 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeStoredBlock(secondLiteral, false)
         quineData += bytesToAdd
-        distanceToFooter += bytesToAdd.size - 5
+        // distanceToFooter += bytesToAdd.size - 5
 
         // R
         val pAnd1 = firstLiteral.size + secondLiteral.size + 5 // + 5 because of the R1
@@ -451,8 +471,8 @@ class ZIPArchiver(private val zipName: String,
         // Add to zip
         bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
         quineData += bytesToAdd
-        distanceToFooter += Rlength + 5
-
+        // distanceToFooter += Rlength + 5
+        var distanceToFooter = footer2.size + 5 // We can replace the earlier distanceToFooter, our repeat then does not need to go so far back --> from ~16KiB limit to ~32 KiB per file
         // Do it once and if we can't fit the last repeat in under one unit, keep repeating until we can
         do {
             // Keep track of the encoding for the literal
@@ -682,6 +702,11 @@ class ZIPArchiver(private val zipName: String,
             } else {
                 changed = false
                 lastRepeats = rw + ry
+            }
+
+            if (rydistance > 128 * 256) {
+                println("The distance for the repeat token is to big. Unable to create a zip quine with a loop.")
+                exitProcess(0)
             }
         }
         return lastRepeats
