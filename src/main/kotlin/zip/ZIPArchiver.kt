@@ -463,6 +463,15 @@ class ZIPArchiver(private val zipName: String,
         val pAnd1 = firstLiteral.size + secondLiteral.size + 5 // + 5 because of the R1
         var repeats = mutableListOf(LZ77Repeat(5, 5)) // R1
         val Rlength = secondLiteral.size
+
+        if (pAnd1 > 128 * 256) {
+            println("Distance for repeat token after the initial two literals is to big.")
+            println("Unable to create a zip loop.")
+            exitProcess(0)
+        }
+
+        // You could use 258 here as maximum length, but this might cause a length to be < 3, which is not allowed
+        // This is a simple fix
         for (i in 1..(Rlength / 258)) {
             repeats.add(LZ77Repeat(pAnd1, 258))
         }
@@ -524,6 +533,12 @@ class ZIPArchiver(private val zipName: String,
             if (repeats.size == 1 && bytesToAdd.size != 5) {
                 val repeat: LZ77Repeat = repeats[0]
                 bytesToAdd = getFiveByteRepeat(repeat)
+            }
+            // TODO: sometimes bytes to add is empty, while it might still be possible to create such a 5 bytes repeat
+            if (bytesToAdd.isEmpty()) {
+                println("Unable to create a repeat of exactly five bytes.")
+                println("Unable to create a zip loop.")
+                exitProcess(0)
             }
 
             quineData += bytesToAdd
@@ -631,6 +646,10 @@ class ZIPArchiver(private val zipName: String,
 
         for (i in 3 until length) {
             val repeat1 = LZ77Repeat(distance, i)
+
+            if (length - i < 3)
+                continue
+
             val repeat2 = LZ77Repeat(distance, length - i)
             val repeats = listOf(repeat1, repeat2)
             val bytes = huffman.encodeRepeatStaticBlock(repeats, false)
