@@ -530,11 +530,16 @@ class ZIPArchiver(private val zipName: String,
             bytesToAdd = huffman.encodeRepeatStaticBlock(repeats, false)
             distanceToFooter += x.size
 
+            var done = false
             if (repeats.size == 1 && bytesToAdd.size != 5) {
                 val repeat: LZ77Repeat = repeats[0]
-                bytesToAdd = getFiveByteRepeat(repeat)
+                val fiveByteRepeat = getFiveByteRepeat(repeat)
+                if (fiveByteRepeat.isNotEmpty()) {
+                    bytesToAdd = fiveByteRepeat
+                    done = true
+                }
             }
-            // TODO: sometimes bytes to add is empty, while it might still be possible to create such a 5 bytes repeat
+
             if (bytesToAdd.isEmpty()) {
                 println("Unable to create a repeat of exactly five bytes.")
                 println("Unable to create a zip loop.")
@@ -542,7 +547,7 @@ class ZIPArchiver(private val zipName: String,
             }
 
             quineData += bytesToAdd
-        } while (bytesToAdd.size < 4)
+        } while (!done)
         // Keep track of the encoding for the literal
         var lZAndThree = byteArrayOf()
 
