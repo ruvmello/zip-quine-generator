@@ -29,7 +29,8 @@ class CRC32Bruteforcer(private val numThreads: Int) {
      * @param cdSize is the size of the central directory
      * @return the ByteArray of the full file that contains the right checksum, if no checksum is found we just use 0
      */
-    fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): ByteArray {
+    fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): Boolean {
+//    fun bruteforce(fullZipFile: ByteArray, quine: ByteArray, backupSize: Int, lhQuineSize: Int, cdSize: Int): ByteArray {
         val range = Int.MIN_VALUE..Int.MAX_VALUE
         val segmentSize: Int = ((range.last.toLong() - range.first.toLong() + 1) / numThreads).toInt()
 
@@ -118,11 +119,13 @@ class CRC32Bruteforcer(private val numThreads: Int) {
         println("Starting brute-forcing the CRC32... Done (${doneIterations.get()} / $totalIterations - ${(doneIterations.get().toDouble() * 100 / totalIterations).toString().take(4)}%)")
 
         return if (resultFound.get()) {
-            result.get()
+//            result.get()
+            true
         } else {
-            println("Warning: No CRC32 is found, using 0 instead.")
-            val byteFormOfCrc = getByteArrayOf4Bytes(0)
-            firstPartLh + byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
+//            println("Warning: No CRC32 is found, using 0 instead.")
+//            val byteFormOfCrc = getByteArrayOf4Bytes(0)
+//            firstPartLh + byteFormOfCrc + secondPartLh + byteFormOfCrc + firstPartCd + byteFormOfCrc + secondPartCd + byteFormOfCrc + lastPartCd
+            false
         }
     }
 

@@ -5,7 +5,9 @@ import lz77.LZ77Literal
 import lz77.LZ77Repeat
 import lz77.LZ77Token
 import org.testng.annotations.Test
+import zip.ZIPArchiver
 import java.io.File
+import kotlin.random.Random
 
 class HuffmanTest {
 
@@ -81,5 +83,52 @@ class HuffmanTest {
         // d
         assert(((tree.right as CompositeNode).right as CompositeNode).right.weight == 3)
         assert((((tree.right as CompositeNode).right as CompositeNode).right as LeafNode).symbol == 'd'.code.toUByte())
+    }
+
+    @Test
+    fun writeTestsForThesis(){
+        val h = HuffmanCompressor()
+        for(i in 250..258) {
+            val repeats = listOf(LZ77Repeat(19, 19))
+            val encoded = h.encodeRepeatStaticBlock(repeats, false)
+            if (h.totalBitsSet == 0) {
+                println("gevonden")
+            }
+//            encoded.forEach { println(String.format("%8s", Integer.toBinaryString(it.toInt() and 0xFF)).replace(' ', '0')) }
+//            val f = File("test.bin")
+//            f.writeBytes(encoded)
+        }
+    }
+
+    @Test
+    fun maxRepeat(){
+        val zipper = ZIPArchiver("Test", false, true, 1)
+        var max = 0
+        for (sizeS in 100..256 * 128){
+            // lastRepeat and 2 * L0
+            val test = zipper.calculateLastQuineRepeat(32347)
+            if (32347 + test.size > 256 * 128) {
+                println("max: $max")
+                break
+            }
+            max = sizeS
+        }
+    }
+
+    @Test
+    fun chanceOfMatch(){
+        var numberFound = 0
+        for (i in 1..100) {
+            val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+            val randomName = (1..Random.nextInt(1, 20))
+                .map { Random.nextInt(0, charPool.size).let { charPool[it] } }
+                .joinToString("") + ".zip"
+            val archiver2 = ZIPArchiver(randomName, false, false, 8)
+            val found = archiver2.createZipFile(listOf())
+            if (found == true) {
+                numberFound += 1
+            }
+            println("iteration $i, found: $numberFound")
+        }
     }
 }

@@ -1,4 +1,5 @@
 import zip.ZIPArchiver
+import kotlin.random.Random
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -35,7 +36,20 @@ fun main(args: Array<String>) {
 
     val archiver = ZIPArchiver(outputFilePath, debug, noCrc, numThreads)
     if (enableLoop) {
-        archiver.createZipLoop(inputFiles)
+//        archiver.createZipLoop(inputFiles)
+        var numberFound = 0
+        for (i in 1..100) {
+            val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+            val randomName = (1..Random.nextInt(1, 20))
+                .map { Random.nextInt(0, charPool.size).let { charPool[it] } }
+                .joinToString("") + ".zip"
+            val archiver2 = ZIPArchiver(randomName, false, false, numThreads)
+            val found = archiver2.createZipFile(listOf())
+            if (found == true) {
+                numberFound += 1
+            }
+            println("iteration $i, found: $numberFound")
+        }
     } else {
         archiver.createZipFile(inputFiles)
     }

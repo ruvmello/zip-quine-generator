@@ -18,7 +18,7 @@ class HuffmanCompressor {
     /**
      * This integer indicates how many bits there are set until now.
      */
-    private var totalBitsSet: Int = 0
+    public var totalBitsSet: Int = 0
 
     /**
      * Encode the [tokens] using the Huffman part of the DEFLATE algorithm
