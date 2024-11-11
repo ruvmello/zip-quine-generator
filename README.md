@@ -8,15 +8,16 @@ This project explores the creation of recursive and "loopy" zip files — unique
 ## Table of Contents
 - [Introduction](#introduction)
 - [Features](#features)
-- [Technical Details](#technical-details)
+- [Installation](#installation)
+- [Details](#details)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Introduction
 Zip files are commonly used as a compression method to package files and folders. This project introduces two unique types of zip files:
 
- - Recursive Zip Files: Zip files that contain themselves endlessly.
- - Loopy Zip Files: A novel approach where a zip file contains another zip file, which contains the original zip file, creating an infinite loop structure.
+ - Recursive Zip Files: Zip files that contain themselves endlessly. See the example [zipquine.zip](https://github.com/ruvmello/zip-quine-generator/tree/master/examples)
+ - Loopy Zip Files: A novel approach where a zip file contains another zip file, which contains the original zip file, creating an infinite loop structure. See the example [Ouroboros.zip](https://github.com/ruvmello/zip-quine-generator/tree/master/examples)
 
 This generator, written in Kotlin, provides an easy way to create both recursive and loopy zip files.
 
