@@ -9,6 +9,27 @@ class CRC32Engine {
 }
 
 /**
+ * Calculates a CRC
+ *
+ * @param data The data to calculate
+ * @return The CRC32 checksum
+ */
+fun CRC32Engine.Companion.calculateCRC(data: ByteArray): ByteArray {
+    var ret = 0xffffffffU
+    for (byte in data) {
+        ret = ret xor (byte.toUInt() and 0xffU)
+        for (i in 0 until 8) {
+            ret = if (ret and 1U == 1U) {
+                (ret shr 1) xor 0xEDB88320U
+            } else {
+                ret shr 1
+            }
+        }
+    }
+    return getByteArrayOf4Bytes(ret.inv().toInt())
+}
+
+/**
  * Solves a "rank 1" CRC. This means that there's one file with one CRC value
  * which may have to occur within the file itself. For example, the string
  *

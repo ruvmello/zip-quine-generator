@@ -148,8 +148,6 @@ class ZIPArchiver(private val zipName: String,
      * @return triple that includes the local file header, compressed data, central directory
      */
     fun compressFiles(inputFiles: List<String>, loopEnabled: Boolean = false): Triple<List<ByteArray>, List<ByteArray>, List<ByteArray>> {
-        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
-
         print("Compressing the given files...\r")
         val lh = mutableListOf<ByteArray>()
         val compressedStream = mutableListOf<ByteArray>()
@@ -163,14 +161,14 @@ class ZIPArchiver(private val zipName: String,
                 file.name,
                 compressedStream.last().size,
                 file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+                CRC32Engine.calculateCRC(file.readBytes()),
             ))
             cd.add(this.getCentralDirectoryFileHeader(
                 file.name,
                 compressedStream.last().size,
                 offset,
                 file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+                CRC32Engine.calculateCRC(file.readBytes()),
             ))
 
             // If we have a loop, the idea is that each zip contains one file,
@@ -193,7 +191,6 @@ class ZIPArchiver(private val zipName: String,
         val zip = File(this.zipName)
         // Clear zip file
         zip.writeBytes(byteArrayOf())
-        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
         val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles)
 
         // ### Quine ###
@@ -244,12 +241,13 @@ class ZIPArchiver(private val zipName: String,
 
         val crcOffsets = setOf(
                 header.size + 14,
-                header.size + 18 + lhQuine.size + 5 + header.size + 14,
+                header.size + lhQuine.size + 5 + header.size + 14,
                 header.size + lhQuine.size + indexOfFooterInQuine + 16,
                 header.size + lhQuine.size + quine.size + cd.size + 16,
         )
         CRC32Engine.solveRank1CRC(fullZipFile, crcOffsets)
         zip.writeBytes(fullZipFile)
+	println(CRC32Engine.calculateCRC(byteArrayOf((65).toByte(), (66).toByte(), (67).toByte())).toHexString())
 
         println("ZIP written to ${this.zipName}")
     }
