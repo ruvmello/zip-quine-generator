@@ -247,7 +247,6 @@ class ZIPArchiver(private val zipName: String,
         )
         CRC32Engine.solveRank1CRC(fullZipFile, crcOffsets)
         zip.writeBytes(fullZipFile)
-	println(CRC32Engine.calculateCRC(byteArrayOf((65).toByte(), (66).toByte(), (67).toByte())).toHexString())
 
         println("ZIP written to ${this.zipName}")
     }

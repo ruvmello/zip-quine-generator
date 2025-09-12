@@ -40,9 +40,7 @@ fun CRC32Engine.Companion.calculateCRC(data: ByteArray): ByteArray {
  * is a rank-1 CRC, as the bytes of the CRC appear within the message itself.
  *
  * This is a specific case of rank-n CRCs, where we may have multiple files with
- * checksums that appear in each other. Generally rank-n CRCs can be solved with
- * Gaussian elimination over GF(2^32), but that seems a bit excessive for this
- * use case.
+ * checksums that appear in each other.
  *
  * This overwrites the bytes in `data`
  *
@@ -50,42 +48,129 @@ fun CRC32Engine.Companion.calculateCRC(data: ByteArray): ByteArray {
  * @param offsets are the locations where the CRC appears within the file.
  */
 fun CRC32Engine.Companion.solveRank1CRC(data: ByteArray, offsets: Set<Int>) {
-    var i = 0
-    var basePolynomial = 0xffffffffUL
-    var offsetsPolynomial = 0UL
-    while (i < data.size) {
-        if (offsets.contains(i)) {
-            basePolynomial = multiply(basePolynomial, 0x100000000UL, POLYNOMIAL)
-            offsetsPolynomial = offsetsPolynomial xor 1UL
-            offsetsPolynomial = multiply(offsetsPolynomial, 0x100000000UL, POLYNOMIAL)
-            i += 4
-            continue
-        }
-
-        for (j in 0..<8) {
-            if (((data[i].toInt() and 0xff) and (1 shl j)) != 0) {
-                basePolynomial = basePolynomial xor 0x80000000UL
-            }
-            basePolynomial = multiply(basePolynomial, 2UL, POLYNOMIAL)
-        }
-        offsetsPolynomial = multiply(offsetsPolynomial, 0x100UL, POLYNOMIAL)
-
-        i++
+    val map = HashMap<Int, Int>()
+    for (offset in offsets) {
+        map.put(offset, 0)
     }
-    val mathematicalValue = divide(basePolynomial xor 0xffffffffUL, offsetsPolynomial xor 1UL, POLYNOMIAL)
-    var implementationValue = 0UL
-    for (i in 0..<32) {
-        if ((mathematicalValue and (1UL shl i)) != 0UL) {
-            implementationValue = implementationValue or (1UL shl (31 - i))
-        }
-    }
-    var crcBytes = getByteArrayOf4Bytes(implementationValue.toInt())
+
+    var crcBytesValues = solveCRCSystem(Pair(data, map))
+    var crcBytes = crcBytesValues[0]
     for (offset in offsets) {
         data[offset+0] = crcBytes[0]
         data[offset+1] = crcBytes[1]
         data[offset+2] = crcBytes[2]
         data[offset+3] = crcBytes[3]
     }
+}
+
+/**
+ * Solves a CRC system with multiple files which potentially reference each
+ * others's CRCs using Gauss-Jordan elimination.
+ *
+ * @param files A list of files to solve for CRCs. The associated map goes from
+ * offsets to file IDs, where 0 is the first file, 1 is the second, and so on.
+ * @return The CRCs of each file
+ */
+fun CRC32Engine.Companion.solveCRCSystem(vararg files: Pair<ByteArray, Map<Int, Int>>): Array<ByteArray> {
+    val n = files.size
+
+    // Augmented matrix of polynomials
+    var matrix = Array(n) { Array(n+1) {0UL} }
+
+    // Construct augmented matrix
+    for (file in 0 until n) {
+        var i = 0
+        val data = files[file].first
+        val offsets = files[file].second
+        matrix[file][n] = 0xffffffffUL
+
+        while (i < data.size) {
+            if (offsets.containsKey(i)) {
+                val offset = offsets.get(i)!!
+                matrix[file][offset] = matrix[file][offset] xor 1UL
+                for (j in 0..n) {
+                    matrix[file][j] = multiply(matrix[file][j], 0x100000000UL, POLYNOMIAL)
+                }
+                i += 4
+                continue
+            }
+
+            for (j in 0 until 8) {
+                if (((data[i].toInt() and 0xff) and (1 shl j)) != 0) {
+                    matrix[file][n] = matrix[file][n] xor 0x80000000UL
+                }
+                matrix[file][n] = multiply(matrix[file][n], 2UL, POLYNOMIAL)
+            }
+            for (j in 0 until n) {
+                matrix[file][j] = multiply(matrix[file][j], 0x100UL, POLYNOMIAL)
+            }
+
+            i++
+        }
+    }
+
+    for (file in 0 until n) {
+        matrix[file][file] = matrix[file][file] xor 1UL
+        matrix[file][n] = matrix[file][n] xor 0xffffffffUL
+    }
+
+    // Convert to upper triangular matrix
+    for (solvingRow in 0 until n) {
+        var exchange = solvingRow
+        while (exchange < n) {
+            if (matrix[exchange][solvingRow] != 0UL) {
+                break
+            }
+            exchange++
+        }
+
+        // The matrix rank is less than n, so there isn't a unique solution.
+        // This assertion will almost never fail, although it technically could.
+        // If it does fail, that means that there is no solution or more than
+        // one solution.
+        assert(exchange < n) {"Gauss-Jordan elimination failed while solving CRC"}
+
+        // Swap in a good row
+        if (solvingRow != exchange) {
+            val backup = matrix[solvingRow]
+            matrix[solvingRow] = matrix[exchange]
+            matrix[exchange] = backup
+        }
+
+        // Eliminate all the other rows
+
+        val inverse = minv(matrix[solvingRow][solvingRow], POLYNOMIAL)
+        for (eliminatingRow in solvingRow+1 until n) {
+            val anchor = matrix[eliminatingRow][solvingRow]
+            val multiplier = multiply(inverse, anchor, POLYNOMIAL)
+            for (eliminatingColumn in 0 until n) {
+                matrix[eliminatingRow][eliminatingColumn] = matrix[eliminatingRow][eliminatingColumn] xor multiply(multiplier, matrix[solvingRow][eliminatingColumn], POLYNOMIAL)
+            }
+        }
+    }
+
+    // Solve the simplified system
+    var results = Array(n) { 0UL }
+    for (row in n-1 downTo 0) {
+        results[row] = matrix[row][n]
+        for (column in row+1 until n) {
+            results[row] = results[row] xor multiply(results[column], matrix[row][column], POLYNOMIAL)
+        }
+        results[row] = divide(results[row], matrix[row][row], POLYNOMIAL)
+    }
+
+    return Array(n,
+        fun(i: Int): ByteArray {
+            var implementationValue = 0UL
+            val mathematicalValue = results[i]
+            for (bit in 0 until 32) {
+                if ((mathematicalValue and (1UL shl bit)) != 0UL) {
+                    implementationValue = implementationValue or (1UL shl (31 - bit))
+                }
+            }
+            return getByteArrayOf4Bytes(implementationValue.toInt())
+        }
+    )
 }
 
 /**
