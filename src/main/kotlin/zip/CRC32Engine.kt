@@ -184,7 +184,7 @@ private fun CRC32Engine.Companion.multiplyRaw(p1: ULong, p2: ULong): ULong {
     var ret: ULong = 0UL
     val probe = findProbe(p1)
 
-    for (i in 0..<64) {
+    for (i in 0 until 64) {
         if ((p2 and (1UL shl i)) != 0UL) {
             assert(probe + i < 64) {"Polynomial multiplication had an overflow"}
             ret = ret xor (p1 shl i)
@@ -203,7 +203,7 @@ private fun CRC32Engine.Companion.multiplyRaw(p1: ULong, p2: ULong): ULong {
 private fun CRC32Engine.Companion.findProbe(p: ULong): Int {
     var ret = 0
 
-    for (i in 0..<64) {
+    for (i in 0 until 64) {
         if ((1UL shl i) and p != 0UL) {
             ret = i
         }
