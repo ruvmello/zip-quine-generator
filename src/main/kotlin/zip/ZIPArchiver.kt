@@ -1,5 +1,6 @@
 package zip
 
+import utils.findLastSublistOfByteArray
 import huffman.HuffmanCompressor
 import lz77.LZ77Compressor
 import lz77.LZ77Literal
@@ -30,6 +31,7 @@ class ZIPArchiver(private val zipName: String,
     private val extraFieldString = "Made By Ruben Van Mello for his master's thesis at the University of Ghent on the generation of zip quines".repeat(10000)
 
     fun createZipLoop(inputFiles: List<String>) {
+        /*
         assert(inputFiles.size == 2) {"A quine loop only supports two files maximum as of the current implementation"}
 
         val zipNames = inputFiles.map { it.substringBeforeLast('.').substringAfterLast('/') + ".zip" }
@@ -136,6 +138,7 @@ class ZIPArchiver(private val zipName: String,
         }
 
         println("ZIP written to ${zip.name}")
+        */
     }
 
     /**
@@ -237,12 +240,16 @@ class ZIPArchiver(private val zipName: String,
         println("Generating the quine... Done")
 
         // Bruteforce zip without recalculating the quine each time
-        if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, header.size, lhQuine.size, cd.size)
-            zip.writeBytes(finalFile)
-        } else {
-            zip.writeBytes(fullZipFile)
-        }
+        val indexOfFooterInQuine = findLastSublistOfByteArray(quine, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
+
+        val crcOffsets = setOf(
+                header.size + 14,
+                header.size + 18 + lhQuine.size + 5 + header.size + 14,
+                header.size + lhQuine.size + indexOfFooterInQuine + 16,
+                header.size + lhQuine.size + quine.size + cd.size + 16,
+        )
+        CRC32Engine.solveRank1CRC(fullZipFile, crcOffsets)
+        zip.writeBytes(fullZipFile)
 
         println("ZIP written to ${this.zipName}")
     }
