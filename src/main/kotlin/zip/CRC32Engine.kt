@@ -143,7 +143,7 @@ fun CRC32Engine.Companion.solveCRCSystem(vararg files: Pair<ByteArray, Map<Int, 
         for (eliminatingRow in solvingRow+1 until n) {
             val anchor = matrix[eliminatingRow][solvingRow]
             val multiplier = multiply(inverse, anchor, POLYNOMIAL)
-            for (eliminatingColumn in 0 until n) {
+            for (eliminatingColumn in 0..n) {
                 matrix[eliminatingRow][eliminatingColumn] = matrix[eliminatingRow][eliminatingColumn] xor multiply(multiplier, matrix[solvingRow][eliminatingColumn], POLYNOMIAL)
             }
         }

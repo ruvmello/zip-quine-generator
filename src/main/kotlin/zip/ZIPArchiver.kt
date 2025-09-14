@@ -128,14 +128,11 @@ class ZIPArchiver(private val zipName: String,
         fullZipFile += footer + lhQuine + quine + footer
         println("Generating the quine... Done")
 
-        // Bruteforce zip without recalculating the quine each time
-        if (!noCrc) {
-            val secondZip = headers[1] + footer2 + lhQuine2 + this.generateQuineLoop(headers[1], header, footer2 + lhQuine2, footer + lhQuine, lhQuine.size) + footer2
-            val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, secondZip, header, headers[1], footer, footer2, lhQuine.size, quine.size)
-            zip.writeBytes(finalFile)
-        } else {
-            zip.writeBytes(fullZipFile)
-        }
+        val secondZip = headers[1] + footer2 + lhQuine2 + this.generateQuineLoop(headers[1], header, footer2 + lhQuine2, footer + lhQuine, lhQuine.size) + footer2
+
+        val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, secondZip, header, headers[1], footer, footer2, lhQuine.size, quine.size)
+
+        zip.writeBytes(finalFile)
 
         println("ZIP written to ${zip.name}")
         */
@@ -247,6 +244,21 @@ class ZIPArchiver(private val zipName: String,
         )
         CRC32Engine.solveRank1CRC(fullZipFile, crcOffsets)
         zip.writeBytes(fullZipFile)
+
+        val o1 = mapOf(
+            2 to 0,
+            6 to 1,
+        )
+        val o2 = mapOf(
+            3 to 0,
+            7 to 1,
+        )
+        val r = CRC32Engine.solveCRCSystem(
+            Pair("hiabcdabcd".toByteArray(),  o1),
+            Pair("byeabcdabcd".toByteArray(), o2),
+        )
+        println(r[0].toHexString())
+        println(r[1].toHexString())
 
         println("ZIP written to ${this.zipName}")
     }

@@ -161,6 +161,8 @@ class CRC32Bruteforcer(private val numThreads: Int) {
                 val crcSecondZip = getByteArrayOf4Bytes(0)
                 val crcFirstZip = getByteArrayOf4Bytes(crcEndofCd)
                 val prevCalculatedPart = cdAfterHeader + crcSecondZip + lhQuineAfterFooter + crcSecondZip + cdOfSecondZip
+
+		// basically fullZipFile???
                 var currentCrcFile = crcFirstZip + lhOfSecondZip + crcFirstZip + cdOfFirstZip + crcSecondZip + lhOfFirstZip + crcSecondZip + cdAfterQuine + crcSecondZip + lastCd
 
 
