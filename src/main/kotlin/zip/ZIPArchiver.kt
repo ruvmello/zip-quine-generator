@@ -19,12 +19,10 @@ import kotlin.system.exitProcess
  *
  * @param zipName the file name to which we write the bytes
  * @param debug this controls if debug data needs to be printed
- * @param noCrc if this value is set to true, we don't bruteforce the CRC-32
  * @param numThreads the number of threads used for brute-forcing
  */
 class ZIPArchiver(private val zipName: String,
                   private val debug: Boolean,
-                  private val noCrc: Boolean,
                   private val numThreads: Int) {
 
     private val datetime = LocalDateTime.now()
