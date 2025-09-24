@@ -1,5 +1,6 @@
 package zip
 
+import utils.findLastSublistOfByteArray
 import huffman.HuffmanCompressor
 import lz77.LZ77Compressor
 import lz77.LZ77Literal
@@ -18,12 +19,10 @@ import kotlin.system.exitProcess
  *
  * @param zipName the file name to which we write the bytes
  * @param debug this controls if debug data needs to be printed
- * @param noCrc if this value is set to true, we don't bruteforce the CRC-32
  * @param numThreads the number of threads used for brute-forcing
  */
 class ZIPArchiver(private val zipName: String,
                   private val debug: Boolean,
-                  private val noCrc: Boolean,
                   private val numThreads: Int) {
 
     private val datetime = LocalDateTime.now()
@@ -38,7 +37,6 @@ class ZIPArchiver(private val zipName: String,
         val zip = File(zipName2)
         // Clear zip file
         zip.writeBytes(byteArrayOf())
-        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
 
         // Get all lh's, compressed streams, cd's
         var (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles, loopEnabled = true)
@@ -126,14 +124,71 @@ class ZIPArchiver(private val zipName: String,
         fullZipFile += footer + lhQuine + quine + footer
         println("Generating the quine... Done")
 
-        // Bruteforce zip without recalculating the quine each time
-        if (!noCrc) {
-            val secondZip = headers[1] + footer2 + lhQuine2 + this.generateQuineLoop(headers[1], header, footer2 + lhQuine2, footer + lhQuine, lhQuine.size) + footer2
-            val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, secondZip, header, headers[1], footer, footer2, lhQuine.size, quine.size)
-            zip.writeBytes(finalFile)
-        } else {
-            zip.writeBytes(fullZipFile)
+        var secondZip = headers[1] + footer2 + lhQuine2 + this.generateQuineLoop(headers[1], header, footer2 + lhQuine2, footer + lhQuine, lhQuine.size) + footer2
+
+        val indexOfCdInFooter = findLastSublistOfByteArray(footer, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
+        val indexOfCdInFooter2 = findLastSublistOfByteArray(footer2, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
+        val prevCalculatedPartSize = header.size + footer.size + lhQuine.size + 5 + header.size + indexOfCdInFooter2 + 16
+        val lhOfSecondZipOffset = header.size + footer.size + lhQuine.size + 5 + header.size + footer.size + 14
+        val cdAfterHeaderOffset = header.size + indexOfCdInFooter + 16
+        val lhQuineAfterFooterOffset = header.size + footer.size + 14
+        val cdOfFirstZipOffset = header.size + footer.size + lhQuine.size + 5 + header.size + footer.size + lhQuine.size + 10 + headers[1].size + indexOfCdInFooter + 16
+        val lhOfFirstZipOffset = header.size + footer.size + lhQuine.size + 5 + header.size + footer.size + lhQuine.size + 10 + headers[1].size + footer.size + 14
+        val cdAfterQuineOffset = header.size + footer.size + lhQuine.size + quine.size + indexOfCdInFooter + 16
+
+        // Since we don't have to use reset bytes to calculate special CRCs
+        // anymore, we just fix these bytes to be zero
+        val indexOfReset = findLastSublistOfByteArray(fullZipFile, byteArrayOf(0xde.toByte(), 0xad.toByte(), 0xbe.toByte(), 0xef.toByte()))
+
+        // CRC offsets
+        val offsets0: Map<Int,Int> = mapOf<Int,Int>(
+            prevCalculatedPartSize to 0,
+            lhOfSecondZipOffset to 0,
+            cdAfterHeaderOffset to 1,
+            lhQuineAfterFooterOffset to 1,
+            cdOfFirstZipOffset to 1,
+            lhOfFirstZipOffset to 1,
+            cdAfterQuineOffset to 1,
+        )
+        val offsets1: Map<Int,Int> = mapOf<Int,Int>(
+            prevCalculatedPartSize to 1,
+            lhOfSecondZipOffset to 1,
+            cdAfterHeaderOffset to 0,
+            lhQuineAfterFooterOffset to 0,
+            cdOfFirstZipOffset to 0,
+            lhOfFirstZipOffset to 0,
+            cdAfterQuineOffset to 0,
+        )
+
+        fullZipFile[indexOfReset+0] = 0
+        fullZipFile[indexOfReset+1] = 0
+        fullZipFile[indexOfReset+2] = 0
+        fullZipFile[indexOfReset+3] = 0
+        secondZip[indexOfReset+0] = 0
+        secondZip[indexOfReset+1] = 0
+        secondZip[indexOfReset+2] = 0
+        secondZip[indexOfReset+3] = 0
+
+        val crcValues = CRC32Engine.solveCRCSystem(
+            Pair(fullZipFile, offsets0),
+            Pair(secondZip,   offsets1),
+        )
+
+        for (entry in offsets0.entries.iterator()) {
+            val crcToUse = when (entry.value) {
+                0 -> crcValues[0]
+                1 -> crcValues[1]
+                else -> byteArrayOf((0).toByte(), (0).toByte(), (0).toByte(), (0).toByte())
+            }
+            fullZipFile[entry.key+0] = crcToUse[0]
+            fullZipFile[entry.key+1] = crcToUse[1]
+            fullZipFile[entry.key+2] = crcToUse[2]
+            fullZipFile[entry.key+3] = crcToUse[3]
         }
+
+        //val finalFile = crc32Bruteforcer.bruteforceLoop(fullZipFile, secondZip, header, headers[1], footer, footer2, lhQuine.size, quine.size)
+
+        zip.writeBytes(fullZipFile)
 
         println("ZIP written to ${zip.name}")
     }
@@ -145,8 +200,6 @@ class ZIPArchiver(private val zipName: String,
      * @return triple that includes the local file header, compressed data, central directory
      */
     fun compressFiles(inputFiles: List<String>, loopEnabled: Boolean = false): Triple<List<ByteArray>, List<ByteArray>, List<ByteArray>> {
-        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
-
         print("Compressing the given files...\r")
         val lh = mutableListOf<ByteArray>()
         val compressedStream = mutableListOf<ByteArray>()
@@ -160,14 +213,14 @@ class ZIPArchiver(private val zipName: String,
                 file.name,
                 compressedStream.last().size,
                 file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+                CRC32Engine.calculateCRC(file.readBytes()),
             ))
             cd.add(this.getCentralDirectoryFileHeader(
                 file.name,
                 compressedStream.last().size,
                 offset,
                 file.length().toInt(),
-                getByteArrayOf4Bytes(crc32Bruteforcer.calculateCRC32(file.readBytes()))
+                CRC32Engine.calculateCRC(file.readBytes()),
             ))
 
             // If we have a loop, the idea is that each zip contains one file,
@@ -190,7 +243,6 @@ class ZIPArchiver(private val zipName: String,
         val zip = File(this.zipName)
         // Clear zip file
         zip.writeBytes(byteArrayOf())
-        val crc32Bruteforcer = CRC32Bruteforcer(numThreads)
         val (localHeaders, dataStreams, centralDirectories) = compressFiles(inputFiles)
 
         // ### Quine ###
@@ -237,12 +289,16 @@ class ZIPArchiver(private val zipName: String,
         println("Generating the quine... Done")
 
         // Bruteforce zip without recalculating the quine each time
-        if (!noCrc) {
-            val finalFile = crc32Bruteforcer.bruteforce(fullZipFile, quine, header.size, lhQuine.size, cd.size)
-            zip.writeBytes(finalFile)
-        } else {
-            zip.writeBytes(fullZipFile)
-        }
+        val indexOfFooterInQuine = findLastSublistOfByteArray(quine, byteArrayOf((80).toByte(), (75).toByte(), (1).toByte(), (2).toByte()))
+
+        val crcOffsets = setOf(
+                header.size + 14,
+                header.size + lhQuine.size + 5 + header.size + 14,
+                header.size + lhQuine.size + indexOfFooterInQuine + 16,
+                header.size + lhQuine.size + quine.size + cd.size + 16,
+        )
+        CRC32Engine.solveRank1CRC(fullZipFile, crcOffsets)
+        zip.writeBytes(fullZipFile)
 
         println("ZIP written to ${this.zipName}")
     }

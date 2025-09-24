@@ -6,7 +6,6 @@ fun main(args: Array<String>) {
     val inputFiles = mutableListOf<String>()
     var outputFilePath: String? = null
     var debug = false
-    var noCrc = false
     var enableLoop = false
     var numThreads = Runtime.getRuntime().availableProcessors()
     while(arguments.isNotEmpty()) {
@@ -14,12 +13,11 @@ fun main(args: Array<String>) {
             "--help", "-h" -> {
                 println("This program aims to create a zip quine.")
                 println("The created zip contains the input file, as well as the zip itself.")
-                println("Usage: ./zipQuine inputFile [-o outputFile (ignored when using loop)] [-h] [--debug] [--no-crc] [--num-threads number_of_threads] [--loop]")
+                println("Usage: ./zipQuine inputFile [-o outputFile (ignored when using loop)] [-h] [--debug] [--num-threads number_of_threads] [--loop]")
                 exitProcess(0)
             }
             "--output", "-o" -> outputFilePath = arguments.removeAt(0)
             "--debug" -> debug = true
-            "--no-crc" -> noCrc = true
             "--loop" -> enableLoop = true
             "--num-threads" -> numThreads = arguments.removeAt(0).toInt()
             else -> inputFiles.add(option)
@@ -33,7 +31,7 @@ fun main(args: Array<String>) {
         outputFilePath = "test.zip"
     }
 
-    val archiver = ZIPArchiver(outputFilePath, debug, noCrc, numThreads)
+    val archiver = ZIPArchiver(outputFilePath, debug, numThreads)
     if (enableLoop) {
         archiver.createZipLoop(inputFiles)
     } else {
