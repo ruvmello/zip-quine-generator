@@ -10,6 +10,7 @@ This project explores the creation of recursive and "loopy" zip files — unique
 - [Features](#features)
 - [Installation](#installation)
 - [Details](#details)
+- [Building a jar](#building-a-jar)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -61,6 +62,12 @@ The creation of these types of zip files is not straight forward. This project w
 Before my thesis, there were only a handfull examples to find of normal recursive zip files. My thesis started as a task to create a generator for these files, since they are so rare.
 As an extension, I explored the the possibility of loopy zip files, which were not found previously. We believe this is the first time this was done and it came with a lot of challenges.
 Because of this achievement, my supervisor suggested to publish this as an article. The full explanation of how these files were created can be read in the journal: https://www.mdpi.com/2076-3417/14/21/9797
+
+## Building a jar
+You can build the jar using maven;
+```
+mvn package -DskipTests
+```
 
 ## Contributing
 1. Fork the repository.
