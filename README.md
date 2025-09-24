@@ -76,6 +76,10 @@ mvn package -DskipTests
 4. Push to the branch (git push origin feature/YourFeature).
 5. Create a new Pull Request.
 
+## Contributors
+Massive thanks to the contributors of the project. You deserve a special mention here from the bottom of my heart:
+- NateChoe1
+
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
